@@ -44,7 +44,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Check if user is waiting for min participants
-    if check_state(user_id, "waiting_for_min_participants:"):
+    if check_state(user_id, "waiting_for_min_participants|"):
         await handle_min_participants(update, context)
         return
     
