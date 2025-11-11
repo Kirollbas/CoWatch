@@ -18,11 +18,6 @@ services:
     networks:
       - co-watch-network
   
-  example:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    command: /bin/sh -c "echo '<h1>Hello from Docker image!</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"
 
 networks:
   co-watch-network:
