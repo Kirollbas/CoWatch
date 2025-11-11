@@ -8,7 +8,11 @@ on:
         required: true
 
 jobs:
+<<<<<<< HEAD
   deploy_dev:
+=======
+  deploy:
+>>>>>>> 6642c7833afc265543702322e9e30697bba7e2ce
     runs-on: self-hosted
 
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.commit_sha != ''
@@ -35,5 +39,10 @@ jobs:
 
       - name: Build Docker image
         run: |
+<<<<<<< HEAD
           docker compose --env-file .env -p dev -f docker-compose.yaml build
           docker compose --env-file .env -p dev -f docker-compose.yaml up -d --no-deps --force-recreate
+=======
+          docker compose --env-file .env -f docker-compose.yaml build
+          docker compose --env-file .env -f docker-compose.yaml up -d --no-deps --force-recreate
+>>>>>>> 6642c7833afc265543702322e9e30697bba7e2ce
