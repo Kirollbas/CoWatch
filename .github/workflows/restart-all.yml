@@ -1,0 +1,39 @@
+name: Redeploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA'
+        required: true
+
+jobs:
+  deploy_dev:
+    runs-on: self-hosted
+
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.commit_sha != ''
+
+    env:
+      POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+      POSTGRES_USER: ${{ vars.POSTGRES_USER }} 
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} 
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_sha }}
+
+      - name: export env
+        run: |
+          ENV_FILE=.env
+          echo "" > $ENV_FILE
+
+          echo "POSTGRES_DB=$POSTGRES_DB" >> $ENV_FILE
+          echo "POSTGRES_USER=$POSTGRES_USER" >> $ENV_FILE
+          echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> $ENV_FILE
+
+      - name: Build Docker image
+        run: |
+          docker compose --env-file .env -p dev -f docker-compose.yaml build
+          docker compose --env-file .env -p dev -f docker-compose.yaml up -d --no-deps --force-recreate
