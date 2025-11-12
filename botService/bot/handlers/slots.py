@@ -73,24 +73,20 @@ async def join_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Add participant
         SlotParticipantRepository.add_participant(db, slot_id, user_id)
         
+        # Refresh slot to get updated participants
+        db.refresh(slot)
+        
         # Check if should create room
         if RoomManager.should_create_room(slot):
-            # Create room
-            room = RoomRepository.create(db, slot_id)
-            slot.status = SlotStatus.FULL
-            db.commit()
-            
-            # Stub: would create Telegram group here
-            RoomManager.create_room_for_slot(slot)
-            
-            # Notify creator
-            creator = UserRepository.get_by_id(db, slot.creator_id)
-            if creator:
-                await context.bot.send_message(
-                    chat_id=slot.creator_id,
-                    text=f"✅ Набралось достаточно участников для слота!\n\n{format_slot_info(slot)}",
-                    parse_mode="HTML"
-                )
+            # Create room and handle all notifications
+            room = RoomManager.create_room_for_slot(db, slot)
+            if room:
+                # Notify all participants about room creation
+                message = RoomManager.get_room_creation_message(room)
+                RoomManager.notify_participants(context, room, message)
+                
+                # Schedule reminders (stub)
+                RoomManager.schedule_movie_reminder(context, room)
         
         await query.edit_message_text(
             f"✅ Вы присоединились к слоту!\n\n{format_slot_info(slot)}",

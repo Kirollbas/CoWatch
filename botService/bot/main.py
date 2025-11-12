@@ -12,7 +12,8 @@ from bot.config import Config
 from bot.handlers.start import start_command, help_command
 from bot.handlers.movie import (
     add_movie_command, handle_movie_url, create_slot_callback,
-    handle_slot_datetime, handle_min_participants, find_slots_callback
+    handle_slot_datetime, handle_min_participants, find_slots_callback,
+    separator_callback
 )
 from bot.handlers.slots import (
     my_slots_command, join_slot_callback, cancel_command, leave_slot_callback
@@ -82,6 +83,7 @@ def main():
     application.add_handler(CallbackQueryHandler(join_slot_callback, pattern=r"^join_slot:"))
     application.add_handler(CallbackQueryHandler(leave_slot_callback, pattern=r"^leave_slot:"))
     application.add_handler(CallbackQueryHandler(rate_user_callback, pattern=r"^rate_user:"))
+    application.add_handler(CallbackQueryHandler(separator_callback, pattern=r"^separator"))
     
     # Register message handler (must be last)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
