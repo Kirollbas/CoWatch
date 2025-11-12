@@ -2,6 +2,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from bot.database.session import SessionLocal
 from bot.database.repositories import (
@@ -156,7 +157,7 @@ async def handle_slot_datetime(update: Update, context: ContextTypes.DEFAULT_TYP
         from bot.config import Config
         
         # Ask for min participants
-        set_state(user_id, f"waiting_for_min_participants:{movie_id}:{datetime_obj.isoformat()}")
+        set_state(user_id, f"waiting_for_min_participants|{movie_id}|{datetime_obj.isoformat()}")
         
         await update.message.reply_text(
             f"Время установлено: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n\n"
@@ -172,10 +173,10 @@ async def handle_min_participants(update: Update, context: ContextTypes.DEFAULT_
     user_id = update.effective_user.id
     
     state = get_state(user_id)
-    if not state or not state.startswith("waiting_for_min_participants:"):
+    if not state or not state.startswith("waiting_for_min_participants|"):
         return
     
-    parts = state.split(":")
+    parts = state.split("|")
     movie_id = int(parts[1])
     datetime_str = parts[2]
     datetime_obj = datetime.fromisoformat(datetime_str)
