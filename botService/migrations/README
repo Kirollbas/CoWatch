@@ -1,0 +1,13 @@
+Alembic migrations for CoWatch bot database.
+
+Commands:
+- Generate new revision (autogenerate): 
+  alembic -c alembic.ini revision --autogenerate -m "message"
+
+- Upgrade to head:
+  alembic -c alembic.ini upgrade head
+
+- Downgrade one step:
+  alembic -c alembic.ini downgrade -1
+
+

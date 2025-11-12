@@ -24,6 +24,9 @@ class User(Base):
     slot_participations = relationship("SlotParticipant", back_populates="user")
     ratings_given = relationship("Rating", back_populates="rater", foreign_keys="Rating.rater_id")
     ratings_received = relationship("Rating", back_populates="rated", foreign_keys="Rating.rated_id")
+    comments = relationship("Comment", back_populates="user")
+    likes = relationship("Like", back_populates="user")
+    watch_history = relationship("WatchHistory", back_populates="user")
 
 
 class Movie(Base):
@@ -42,6 +45,7 @@ class Movie(Base):
     
     # Relationships
     slots = relationship("Slot", back_populates="movie")
+    episodes = relationship("Episode", back_populates="series")
 
 
 class Slot(Base):
@@ -95,6 +99,7 @@ class Room(Base):
     # Relationships
     slot = relationship("Slot", back_populates="room")
     ratings = relationship("Rating", back_populates="room")
+    comments = relationship("Comment", back_populates="room")
 
 
 class Rating(Base):
@@ -113,3 +118,73 @@ class Rating(Base):
     rater = relationship("User", back_populates="ratings_given", foreign_keys=[rater_id])
     rated = relationship("User", back_populates="ratings_received", foreign_keys=[rated_id])
 
+
+class Episode(Base):
+    """Episode model for series"""
+    __tablename__ = "episodes"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    series_id = Column(Integer, ForeignKey("movies.id"), nullable=False)  # references Movie with type 'series'
+    season_number = Column(Integer, nullable=False)
+    episode_number = Column(Integer, nullable=False)
+    title = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    air_date = Column(DateTime, nullable=True)
+    runtime_minutes = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    
+    # Relationships
+    series = relationship("Movie", back_populates="episodes")
+    comments = relationship("Comment", back_populates="episode")
+    watch_history = relationship("WatchHistory", back_populates="episode")
+
+
+class Comment(Base):
+    """Comments inside a room, optionally bound to a specific episode"""
+    __tablename__ = "comments"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    episode_id = Column(Integer, ForeignKey("episodes.id"), nullable=True)
+    content = Column(Text, nullable=False)
+    reply_to_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    
+    # Relationships
+    room = relationship("Room", back_populates="comments")
+    user = relationship("User", back_populates="comments")
+    episode = relationship("Episode", back_populates="comments")
+    likes = relationship("Like", back_populates="comment", cascade="all, delete-orphan")
+
+
+class Like(Base):
+    """Likes for comments"""
+    __tablename__ = "likes"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    
+    # Relationships
+    comment = relationship("Comment", back_populates="likes")
+    user = relationship("User", back_populates="likes")
+
+
+class WatchHistory(Base):
+    """Watch history of users for movies and episodes"""
+    __tablename__ = "watch_history"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
+    episode_id = Column(Integer, ForeignKey("episodes.id"), nullable=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=True)
+    watched_at = Column(DateTime, default=lambda: datetime.utcnow())
+    progress_seconds = Column(Integer, nullable=True)  # optional playback progress
+    completed = Column(Integer, default=0)  # 0/1
+    
+    # Relationships
+    user = relationship("User", back_populates="watch_history")
+    episode = relationship("Episode", back_populates="watch_history")
