@@ -221,7 +221,7 @@ async def create_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         
         # Store state for conversation
-        set_state(user_id, f"waiting_for_slot_datetime:{movie_id}")
+        set_state(user_id, f"waiting_for_slot_datetime|{movie_id}")
         
         await query.edit_message_text(
             f"Создание слота для: <b>{movie.title}</b>\n\n"
@@ -238,10 +238,10 @@ async def handle_slot_datetime(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     
     state = get_state(user_id)
-    if not state or not state.startswith("waiting_for_slot_datetime:"):
+    if not state or not state.startswith("waiting_for_slot_datetime|"):
         return
     
-    movie_id = int(state.split(":")[1])
+    movie_id = int(state.split("|")[1])
     datetime_str = update.message.text.strip()
     
     from bot.utils.validators import parse_datetime
