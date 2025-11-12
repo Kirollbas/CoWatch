@@ -46,9 +46,8 @@ async def handle_movie_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     db: Session = SessionLocal()
     try:
-        # Parse movie data (stub)
-        parser = MovieParser()
-        movie_data = parser.parse_url(url)
+        # Parse movie data using Kinopoisk API
+        movie_data = MovieParser.parse_url(url)
         
         if not movie_data:
             await update.message.reply_text("❌ Не удалось обработать ссылку. Попробуйте другую.")
