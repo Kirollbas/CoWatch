@@ -34,6 +34,11 @@ docker-compose up -d postgres
 
 6. Инициализируйте базу данных:
 ```bash
+# через Alembic миграции
+cd botService
+alembic -c alembic.ini upgrade head
+
+# быстрое создание таблиц без миграций
 python -m bot.database.init_db
 ```
 
@@ -42,6 +47,19 @@ python -m bot.database.init_db
 python run_bot.py
 ```
 
+### Работа с миграциями
+
+```bash
+cd botService
+# создать новую ревизию с автогенерацией изменений схемы
+alembic -c alembic.ini revision --autogenerate -m "your message"
+
+# применить миграции
+alembic -c alembic.ini upgrade head
+
+# откатить одну миграцию
+alembic -c alembic.ini downgrade -1
+```
 ## Команды бота
 
 - `/start` - Начать работу с ботом

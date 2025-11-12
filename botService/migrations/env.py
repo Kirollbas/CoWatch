@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from logging.config import fileConfig
 
 from alembic import context
@@ -15,8 +16,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Add project path to import modules
-if "/Users/nikitabogatyrev/mag/CoWatch/botService" not in sys.path:
-    sys.path.insert(0, "/Users/nikitabogatyrev/mag/CoWatch/botService")
+# migrations/env.py located in botService/migrations/
+# So project_root = botService/
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Import SQLAlchemy Base and config for DATABASE_URL
 from bot.database.session import Base  # noqa: E402

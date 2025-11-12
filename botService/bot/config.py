@@ -1,5 +1,6 @@
 """Configuration module for the bot"""
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,9 +13,12 @@ class Config:
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL or DATABASE_URL == "postgresql://cowatch_user:cowatch_password@localhost:5432/cowatch":
         # Используем SQLite если PostgreSQL не настроен
-        DATABASE_URL = os.getenv("DATABASE_URL_SQLITE", "sqlite:///./cowatch.db")
+        # Определяем путь к БД относительно корня проекта (botService/)
+        project_root = Path(__file__).parent.parent
+        db_path = os.getenv("DATABASE_PATH", str(project_root / "cowatch.db"))
+        DATABASE_URL = os.getenv("DATABASE_URL_SQLITE", f"sqlite:///{db_path}")
         if not DATABASE_URL.startswith("sqlite"):
-            DATABASE_URL = "sqlite:///./cowatch.db"
+            DATABASE_URL = f"sqlite:///{db_path}"
     
     MIN_PARTICIPANTS_DEFAULT = int(os.getenv("MIN_PARTICIPANTS_DEFAULT", "2"))
     

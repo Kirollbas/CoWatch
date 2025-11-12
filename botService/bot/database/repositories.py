@@ -1,9 +1,12 @@
 """Repository pattern for database operations"""
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from datetime import datetime
 
-from bot.database.models import User, Movie, Slot, SlotParticipant, Room, Rating
+from bot.database.models import (
+    User, Movie, Slot, SlotParticipant, Room, Rating,
+    Episode, Comment, Like, WatchHistory
+)
 from bot.constants import SlotStatus, RoomStatus
 
 
@@ -250,4 +253,237 @@ class RatingRepository:
         ).all()}
         
         return [uid for uid in participants if uid != rater_id and uid not in rated_users]
+
+
+class EpisodeRepository:
+    """Repository for Episode operations"""
+    
+    @staticmethod
+    def create(db: Session, series_id: int, season_number: int, episode_number: int,
+              title: Optional[str] = None, description: Optional[str] = None,
+              air_date: Optional[datetime] = None, runtime_minutes: Optional[int] = None) -> Episode:
+        """Create a new episode"""
+        episode = Episode(
+            series_id=series_id,
+            season_number=season_number,
+            episode_number=episode_number,
+            title=title,
+            description=description,
+            air_date=air_date,
+            runtime_minutes=runtime_minutes
+        )
+        db.add(episode)
+        db.commit()
+        db.refresh(episode)
+        return episode
+    
+    @staticmethod
+    def get_by_id(db: Session, episode_id: int) -> Optional[Episode]:
+        """Get episode by ID"""
+        return db.query(Episode).filter(Episode.id == episode_id).first()
+    
+    @staticmethod
+    def get_by_series(db: Session, series_id: int) -> List[Episode]:
+        """Get all episodes for a series"""
+        return db.query(Episode).filter(
+            Episode.series_id == series_id
+        ).order_by(Episode.season_number, Episode.episode_number).all()
+    
+    @staticmethod
+    def get_by_series_season(db: Session, series_id: int, season_number: int) -> List[Episode]:
+        """Get all episodes for a specific season"""
+        return db.query(Episode).filter(
+            Episode.series_id == series_id,
+            Episode.season_number == season_number
+        ).order_by(Episode.episode_number).all()
+    
+    @staticmethod
+    def find_by_series_season_episode(db: Session, series_id: int, 
+                                      season_number: int, episode_number: int) -> Optional[Episode]:
+        """Find specific episode by series, season, and episode number"""
+        return db.query(Episode).filter(
+            Episode.series_id == series_id,
+            Episode.season_number == season_number,
+            Episode.episode_number == episode_number
+        ).first()
+
+
+class CommentRepository:
+    """Repository for Comment operations"""
+    
+    @staticmethod
+    def create(db: Session, room_id: int, user_id: int, content: str,
+              episode_id: Optional[int] = None, reply_to_id: Optional[int] = None) -> Comment:
+        """Create a new comment"""
+        comment = Comment(
+            room_id=room_id,
+            user_id=user_id,
+            episode_id=episode_id,
+            content=content,
+            reply_to_id=reply_to_id
+        )
+        db.add(comment)
+        db.commit()
+        db.refresh(comment)
+        return comment
+    
+    @staticmethod
+    def get_by_id(db: Session, comment_id: int) -> Optional[Comment]:
+        """Get comment by ID"""
+        return db.query(Comment).filter(Comment.id == comment_id).first()
+    
+    @staticmethod
+    def get_by_room(db: Session, room_id: int, limit: Optional[int] = None) -> List[Comment]:
+        """Get all comments for a room, ordered by creation time"""
+        query = db.query(Comment).filter(Comment.room_id == room_id).order_by(Comment.created_at.desc())
+        if limit:
+            query = query.limit(limit)
+        return query.all()
+    
+    @staticmethod
+    def get_by_episode(db: Session, episode_id: int) -> List[Comment]:
+        """Get all comments for an episode"""
+        return db.query(Comment).filter(
+            Comment.episode_id == episode_id
+        ).order_by(Comment.created_at.desc()).all()
+    
+    @staticmethod
+    def get_replies(db: Session, comment_id: int) -> List[Comment]:
+        """Get all replies to a comment"""
+        return db.query(Comment).filter(
+            Comment.reply_to_id == comment_id
+        ).order_by(Comment.created_at).all()
+    
+    @staticmethod
+    def delete(db: Session, comment_id: int) -> bool:
+        """Delete a comment"""
+        comment = db.query(Comment).filter(Comment.id == comment_id).first()
+        if comment:
+            db.delete(comment)
+            db.commit()
+            return True
+        return False
+
+
+class LikeRepository:
+    """Repository for Like operations"""
+    
+    @staticmethod
+    def toggle_like(db: Session, comment_id: int, user_id: int) -> Tuple[bool, bool]:
+        """Toggle like on a comment. Returns (was_created, is_liked_now)"""
+        existing = db.query(Like).filter(
+            Like.comment_id == comment_id,
+            Like.user_id == user_id
+        ).first()
+        
+        if existing:
+            # Unlike
+            db.delete(existing)
+            db.commit()
+            return (False, False)
+        else:
+            # Like
+            like = Like(comment_id=comment_id, user_id=user_id)
+            db.add(like)
+            db.commit()
+            return (True, True)
+    
+    @staticmethod
+    def has_liked(db: Session, comment_id: int, user_id: int) -> bool:
+        """Check if user has liked a comment"""
+        return db.query(Like).filter(
+            Like.comment_id == comment_id,
+            Like.user_id == user_id
+        ).first() is not None
+    
+    @staticmethod
+    def get_likes_count(db: Session, comment_id: int) -> int:
+        """Get number of likes for a comment"""
+        return db.query(Like).filter(Like.comment_id == comment_id).count()
+    
+    @staticmethod
+    def get_likes_for_comment(db: Session, comment_id: int) -> List[Like]:
+        """Get all likes for a comment"""
+        return db.query(Like).filter(Like.comment_id == comment_id).all()
+
+
+class WatchHistoryRepository:
+    """Repository for WatchHistory operations"""
+    
+    @staticmethod
+    def create_or_update(db: Session, user_id: int, movie_id: int,
+                        episode_id: Optional[int] = None, room_id: Optional[int] = None,
+                        progress_seconds: Optional[int] = None, completed: int = 0) -> WatchHistory:
+        """Create or update watch history entry"""
+        # Try to find existing entry
+        query = db.query(WatchHistory).filter(
+            WatchHistory.user_id == user_id,
+            WatchHistory.movie_id == movie_id
+        )
+        if episode_id:
+            query = query.filter(WatchHistory.episode_id == episode_id)
+        else:
+            query = query.filter(WatchHistory.episode_id.is_(None))
+        
+        watch = query.first()
+        
+        if watch:
+            # Update existing
+            if progress_seconds is not None:
+                watch.progress_seconds = progress_seconds
+            if completed is not None:
+                watch.completed = completed
+            if room_id is not None:
+                watch.room_id = room_id
+            watch.watched_at = datetime.utcnow()
+        else:
+            # Create new
+            watch = WatchHistory(
+                user_id=user_id,
+                movie_id=movie_id,
+                episode_id=episode_id,
+                room_id=room_id,
+                progress_seconds=progress_seconds,
+                completed=completed
+            )
+            db.add(watch)
+        
+        db.commit()
+        db.refresh(watch)
+        return watch
+    
+    @staticmethod
+    def get_user_history(db: Session, user_id: int, limit: Optional[int] = None) -> List[WatchHistory]:
+        """Get watch history for a user"""
+        query = db.query(WatchHistory).filter(
+            WatchHistory.user_id == user_id
+        ).order_by(WatchHistory.watched_at.desc())
+        if limit:
+            query = query.limit(limit)
+        return query.all()
+    
+    @staticmethod
+    def get_by_movie(db: Session, user_id: int, movie_id: int) -> Optional[WatchHistory]:
+        """Get watch history for a specific movie (non-episode)"""
+        return db.query(WatchHistory).filter(
+            WatchHistory.user_id == user_id,
+            WatchHistory.movie_id == movie_id,
+            WatchHistory.episode_id.is_(None)
+        ).first()
+    
+    @staticmethod
+    def get_by_episode(db: Session, user_id: int, episode_id: int) -> Optional[WatchHistory]:
+        """Get watch history for a specific episode"""
+        return db.query(WatchHistory).filter(
+            WatchHistory.user_id == user_id,
+            WatchHistory.episode_id == episode_id
+        ).first()
+    
+    @staticmethod
+    def get_completed_count(db: Session, user_id: int) -> int:
+        """Get count of completed watches for a user"""
+        return db.query(WatchHistory).filter(
+            WatchHistory.user_id == user_id,
+            WatchHistory.completed == 1
+        ).count()
 
