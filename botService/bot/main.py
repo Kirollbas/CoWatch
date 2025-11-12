@@ -41,7 +41,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Check if user is waiting for slot datetime
-    if check_state(user_id, "waiting_for_slot_datetime:"):
+    if check_state(user_id, "waiting_for_slot_datetime|"):
         await handle_slot_datetime(update, context)
         return
     
