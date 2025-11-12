@@ -9,7 +9,7 @@ from bot.utils.keyboards import get_main_menu_keyboard
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /start command"""
+    """Handle /start command with deep link support"""
     user = update.effective_user
     db: Session = SessionLocal()
     
@@ -22,6 +22,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             first_name=user.first_name or "Unknown"
         )
         
+        # Check for deep link parameters
+        if context.args:
+            param = context.args[0]
+            
+            # Handle group creation deep link
+            if param.startswith("movie_"):
+                await handle_group_creation(update, context, param, db)
+                return
+        
+        # Default welcome message
         welcome_text = (
             f"Привет, {user.first_name}! 👋\n\n"
             "Добро пожаловать в <b>CoWatch</b> - бот для совместного просмотра фильмов и сериалов!\n\n"
@@ -38,6 +48,85 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     finally:
         db.close()
+
+
+async def handle_group_creation(update: Update, context: ContextTypes.DEFAULT_TYPE, param: str, db: Session):
+    """Handle group creation from deep link"""
+    import logging
+    from bot.database.repositories import SlotRepository
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Extract slot ID from parameter (movie_123 -> 123)
+        slot_id = int(param.split("_")[1])
+        logger.info(f"Group creation requested for slot {slot_id}")
+        
+        # Get slot information
+        slot = SlotRepository.get_by_id(db, slot_id)
+        if not slot:
+            await update.message.reply_text("❌ Слот не найден.")
+            return
+        
+        # Create group creation instructions
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        # Create a button that opens group creation dialog
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                "👥 Создать группу с участниками",
+                url=f"tg://resolve?domain=telegram&startgroup=cowatch_{slot_id}"
+            )]
+        ])
+        
+        group_msg = f"""🎬 **Создание группы для просмотра**
+
+**Фильм:** {slot.movie.title}
+**Время:** {slot.datetime.strftime('%d.%m.%Y в %H:%M')}
+**Участники:** {len(slot.participants)}
+
+🤖 **Автоматическое создание:**
+1. Нажмите кнопку ниже
+2. Telegram откроет диалог создания группы
+3. Добавьте участников из слота
+4. Бот автоматически отправит ссылку остальным
+
+💡 **Это займет 30 секунд!**"""
+        
+        await update.message.reply_text(
+            group_msg,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        
+        # Also send a fallback message with manual instructions
+        participants_info = []
+        for participant in slot.participants:
+            try:
+                user_info = await context.bot.get_chat(participant.user_id)
+                if user_info.username:
+                    participants_info.append(f"• @{user_info.username} ({user_info.first_name})")
+                else:
+                    participants_info.append(f"• {user_info.first_name}")
+            except:
+                if participant.user_id == 999888777:
+                    participants_info.append(f"• @petontyapa")
+                else:
+                    participants_info.append(f"• User {participant.user_id}")
+        
+        manual_msg = f"""📱 **Участники для добавления в группу:**
+
+{chr(10).join(participants_info)}
+
+**Название группы:** 🎬 {slot.movie.title} - {slot.datetime.strftime('%d.%m')}
+
+💡 Если автоматическое создание не работает, создайте группу вручную и добавьте всех участников."""
+        
+        await update.message.reply_text(manual_msg, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error handling group creation: {e}")
+        await update.message.reply_text("❌ Ошибка при создании группы. Попробуйте позже.")
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

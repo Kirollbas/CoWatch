@@ -15,10 +15,12 @@ from bot.handlers.movie import (
     handle_slot_datetime, handle_min_participants, find_slots_callback
 )
 from bot.handlers.slots import (
-    my_slots_command, join_slot_callback, cancel_command, leave_slot_callback
+    my_slots_command, join_slot_callback, cancel_command, leave_slot_callback,
+    create_group_callback
 )
 from bot.handlers.profile import profile_command, my_rooms_command
 from bot.handlers.rating import rate_command, rate_user_callback
+from bot.handlers.group import handle_bot_added_to_group
 from bot.utils.states import check_state
 
 # Configure logging
@@ -81,7 +83,12 @@ def main():
     application.add_handler(CallbackQueryHandler(find_slots_callback, pattern=r"^find_slots:"))
     application.add_handler(CallbackQueryHandler(join_slot_callback, pattern=r"^join_slot:"))
     application.add_handler(CallbackQueryHandler(leave_slot_callback, pattern=r"^leave_slot:"))
+    application.add_handler(CallbackQueryHandler(create_group_callback, pattern=r"^create_group:"))
     application.add_handler(CallbackQueryHandler(rate_user_callback, pattern=r"^rate_user:"))
+    
+    # Register chat member handler for group management
+    from telegram.ext import ChatMemberHandler
+    application.add_handler(ChatMemberHandler(handle_bot_added_to_group, ChatMemberHandler.MY_CHAT_MEMBER))
     
     # Register message handler (must be last)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))

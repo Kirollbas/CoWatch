@@ -18,6 +18,9 @@ class Config:
     
     MIN_PARTICIPANTS_DEFAULT = int(os.getenv("MIN_PARTICIPANTS_DEFAULT", "2"))
     
+    # Kinopoisk API configuration
+    KINOPOISK_API_KEY = os.getenv("KINOPOISK_API_KEY")
+    
     @classmethod
     def validate(cls):
         """Validate that all required configuration is present"""
