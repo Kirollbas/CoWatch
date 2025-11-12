@@ -16,7 +16,7 @@ def get_movie_actions_keyboard(movie_id: int):
     keyboard = [
         [
             InlineKeyboardButton("Создать слот", callback_data=f"create_slot:{movie_id}"),
-            InlineKeyboardButton("Найти слоты", callback_data=f"find_slots:{movie_id}")
+            InlineKeyboardButton("Выбрать слот", callback_data=f"find_slots:{movie_id}")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)

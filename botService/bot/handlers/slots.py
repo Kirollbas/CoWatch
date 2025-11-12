@@ -80,8 +80,8 @@ async def join_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             slot.status = SlotStatus.FULL
             db.commit()
             
-            # Stub: would create Telegram group here
-            RoomManager.create_room_for_slot(slot)
+            # Create Telegram group
+            await RoomManager.create_room_for_slot(slot, context.bot)
             
             # Notify creator
             creator = UserRepository.get_by_id(db, slot.creator_id)
@@ -156,3 +156,45 @@ async def leave_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     finally:
         db.close()
 
+
+
+
+async def create_group_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle create_group callback - trigger group creation for full slot"""
+    query = update.callback_query
+    await query.answer()
+    
+    slot_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+    
+    db: Session = SessionLocal()
+    try:
+        slot = SlotRepository.get_by_id(db, slot_id)
+        if not slot:
+            await query.edit_message_text("❌ Слот не найден.")
+            return
+        
+        # Check if user is participant in this slot
+        is_participant = any(p.user_id == user_id for p in slot.participants)
+        if not is_participant:
+            await query.edit_message_text("❌ Вы не участвуете в этом слоте.")
+            return
+        
+        # Check if slot is full
+        if slot.status != SlotStatus.FULL or len(slot.participants) < slot.min_participants:
+            await query.edit_message_text("❌ Слот еще не готов для создания группы.")
+            return
+        
+        # Trigger group creation
+        await RoomManager.create_room_for_slot(slot, context.bot)
+        
+        await query.edit_message_text(
+            f"🎬 Группа создается!\n\n{format_slot_info(slot)}\n\n"
+            "Нажмите кнопку ниже, чтобы создать Telegram группу:",
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        await query.edit_message_text(f"❌ Ошибка: {str(e)}")
+    finally:
+        db.close()

@@ -137,7 +137,7 @@ class SlotRepository:
         """Get all slots where user is a participant"""
         return db.query(Slot).join(SlotParticipant).filter(
             SlotParticipant.user_id == user_id,
-            Slot.status == SlotStatus.OPEN
+            Slot.status.in_([SlotStatus.OPEN, SlotStatus.FULL])
         ).all()
 
 
