@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import io
 
 from bot.database.session import SessionLocal
-from bot.database.repositories import SlotRepository
+from bot.database.repositories import SlotRepository, RoomRepository
 from bot.services.kinopoisk_images_service import KinopoiskImagesService
 
 logger = logging.getLogger(__name__)
@@ -100,6 +100,33 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         logger.info(f"🔍 DEBUG: Movie ID: {active_slot.movie.id}")
         logger.info(f"🔍 DEBUG: Movie title: {active_slot.movie.title}")
         logger.info(f"🔍 DEBUG: Movie Kinopoisk ID: {active_slot.movie.kinopoisk_id}")
+        
+        # Check if room already exists for this slot
+        existing_room = RoomRepository.get_by_slot_id(db, active_slot.id)
+        if existing_room and existing_room.telegram_group_id:
+            # Room already exists and has group ID, update it
+            logger.info(f"✅ Room already exists for slot {active_slot.id}, updating group info")
+            RoomRepository.update_group_info(db, active_slot.id, group_id)
+            await context.bot.send_message(
+                chat_id=group_id,
+                text=f"✅ **Группа уже связана с этим слотом!**\n\n"
+                     f"🎬 **Фильм:** {active_slot.movie.title}\n"
+                     f"📅 **Время:** {active_slot.datetime.strftime('%d.%m.%Y в %H:%M')}\n"
+                     f"👥 **Участники:** {len(active_slot.participants)}\n\n"
+                     f"Группа настроена и готова к использованию!",
+                parse_mode="Markdown"
+            )
+            return
+        
+        # If room exists but doesn't have group ID, update it
+        if existing_room:
+            logger.info(f"✅ Room exists but no group ID, updating...")
+            RoomRepository.update_group_info(db, active_slot.id, group_id)
+        else:
+            # Create new room if it doesn't exist
+            logger.info(f"📝 Creating new room for slot {active_slot.id}")
+            existing_room = RoomRepository.create(db, active_slot.id)
+            RoomRepository.update_group_info(db, active_slot.id, group_id)
         
         # Set up group for specific movie
         logger.info(f"🔧 Setting up group for movie: {active_slot.movie.title}")

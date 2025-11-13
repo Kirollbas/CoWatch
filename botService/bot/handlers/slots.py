@@ -1,4 +1,5 @@
 """Slot handlers - my_slots, join, leave, cancel"""
+import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from sqlalchemy.orm import Session
@@ -14,6 +15,8 @@ from bot.services.room_manager import RoomManager
 from bot.utils.keyboards import get_user_slots_keyboard, get_participant_slots_keyboard
 from bot.utils.formatters import format_slot_info
 from bot.constants import SlotStatus
+
+logger = logging.getLogger(__name__)
 
 
 async def my_slots_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -78,13 +81,23 @@ async def join_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Check if should create room
         if RoomManager.should_create_room(updated_slot):
-            # Create room
-            room = RoomRepository.create(db, slot_id)
-            updated_slot.status = SlotStatus.FULL
-            db.commit()
+            # Check if room already exists
+            existing_room = RoomRepository.get_by_slot_id(db, slot_id)
+            if not existing_room:
+                # Create room only if it doesn't exist
+                room = RoomRepository.create(db, slot_id)
+                updated_slot.status = SlotStatus.FULL
+                db.commit()
+            else:
+                # Room already exists, use it
+                room = existing_room
+                if updated_slot.status != SlotStatus.FULL:
+                    updated_slot.status = SlotStatus.FULL
+                    db.commit()
             
-            # Create Telegram group
-            await RoomManager.create_room_for_slot(updated_slot, context.bot)
+            # Create Telegram group (only if room was just created or needs update)
+            if not existing_room or not room.telegram_group_id:
+                await RoomManager.create_room_for_slot(updated_slot, context.bot)
             
             # Notify creator
             creator = UserRepository.get_by_id(db, updated_slot.creator_id)
@@ -102,7 +115,15 @@ async def join_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode="HTML"
         )
     except Exception as e:
-        await query.edit_message_text(f"❌ Ошибка: {str(e)}")
+        logger.error(f"Error in join_slot_callback for user {user_id}, slot {slot_id}: {e}", exc_info=True)
+        error_msg = "❌ Произошла ошибка при присоединении к слоту."
+        if "UNIQUE constraint" in str(e) or "already exists" in str(e).lower():
+            error_msg += "\n\nВозможно, вы уже участвуете в этом слоте или комната уже создана."
+        try:
+            await query.edit_message_text(error_msg)
+        except:
+            # If we can't edit, try to answer
+            await query.answer(error_msg, show_alert=True)
     finally:
         db.close()
 

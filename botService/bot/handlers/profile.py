@@ -1,5 +1,6 @@
 """Profile and rooms handlers"""
-from telegram import Update
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,8 @@ from bot.database.repositories import (
     UserKinopoiskRepository, UserVoteRepository
 )
 from bot.utils.formatters import format_user_profile, format_room_info
+
+logger = logging.getLogger(__name__)
 
 
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,13 +63,61 @@ async def my_rooms_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         text = "🏠 <b>Ваши активные комнаты:</b>\n\n"
+        buttons = []
+        
         for room in rooms:
             slot = room.slot
             text += f"• <b>{slot.movie.title}</b>\n"
             text += f"  Время: {slot.datetime.strftime('%d.%m.%Y %H:%M')}\n"
-            text += f"  Статус: {room.status}\n\n"
+            text += f"  Статус: {room.status}\n"
+            
+            # Try to get or create invite link for the group
+            invite_link = None
+            if room.telegram_group_id:
+                try:
+                    # Try to get existing invite link from chat info
+                    chat = await context.bot.get_chat(room.telegram_group_id)
+                    if hasattr(chat, 'invite_link') and chat.invite_link:
+                        invite_link = chat.invite_link
+                    else:
+                        # Try to export invite link
+                        try:
+                            invite_link = await context.bot.export_chat_invite_link(room.telegram_group_id)
+                        except Exception as e:
+                            logger.warning(f"Could not export invite link for group {room.telegram_group_id}: {e}")
+                            # Try to create a new invite link
+                            try:
+                                invite_link_obj = await context.bot.create_chat_invite_link(
+                                    chat_id=room.telegram_group_id,
+                                    name=f"Ссылка для {slot.movie.title}"
+                                )
+                                invite_link = invite_link_obj.invite_link
+                            except Exception as e2:
+                                logger.error(f"Could not create invite link for group {room.telegram_group_id}: {e2}")
+                except Exception as e:
+                    logger.error(f"Error getting chat info for group {room.telegram_group_id}: {e}")
+            
+            if invite_link:
+                text += f"  🔗 <a href=\"{invite_link}\">Перейти в группу</a>\n"
+                # Add button for the room
+                button_text = f"🎬 {slot.movie.title[:30]}"
+                buttons.append([InlineKeyboardButton(button_text, url=invite_link)])
+            else:
+                text += f"  ⚠️ Группа не настроена\n"
+            
+            text += "\n"
         
-        await update.message.reply_text(text, parse_mode="HTML")
+        reply_markup = InlineKeyboardMarkup(buttons) if buttons else None
+        
+        await update.message.reply_text(
+            text, 
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+            disable_web_page_preview=True
+        )
+    except Exception as e:
+        logger.error(f"Error in my_rooms_command for user {user_id}: {e}", exc_info=True)
+        await update.message.reply_text("❌ Произошла ошибка при получении списка комнат.")
     finally:
         db.close()
 

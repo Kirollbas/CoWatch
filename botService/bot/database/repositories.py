@@ -281,6 +281,18 @@ class RoomRepository:
         return db.query(Room).filter(Room.slot_id == slot_id).first()
     
     @staticmethod
+    def update_group_info(db: Session, slot_id: int, telegram_group_id: int, telegram_topic_id: Optional[int] = None) -> Optional[Room]:
+        """Update room with Telegram group information"""
+        room = RoomRepository.get_by_slot_id(db, slot_id)
+        if room:
+            room.telegram_group_id = telegram_group_id
+            if telegram_topic_id is not None:
+                room.telegram_topic_id = telegram_topic_id
+            db.commit()
+            db.refresh(room)
+        return room
+    
+    @staticmethod
     def get_user_rooms(db: Session, user_id: int) -> List[Room]:
         """Get all rooms where user is a participant"""
         return db.query(Room).join(Slot).join(SlotParticipant).filter(

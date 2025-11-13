@@ -396,13 +396,21 @@ async def handle_min_participants(update: Update, context: ContextTypes.DEFAULT_
             # Check if should create room
             updated_slot = SlotRepository.get_by_id(db, matching_slot.id)
             if RoomManager.should_create_room(updated_slot):
-                # Create room
-                room = RoomRepository.create(db, matching_slot.id)
-                updated_slot.status = SlotStatus.FULL
-                db.commit()
-                
-                # Create Telegram group
-                await RoomManager.create_room_for_slot(updated_slot, context.bot)
+                # Check if room already exists
+                existing_room = RoomRepository.get_by_slot_id(db, matching_slot.id)
+                if not existing_room:
+                    # Create room
+                    room = RoomRepository.create(db, matching_slot.id)
+                    updated_slot.status = SlotStatus.FULL
+                    db.commit()
+                    
+                    # Create Telegram group
+                    await RoomManager.create_room_for_slot(updated_slot, context.bot)
+                else:
+                    # Room already exists, just update status if needed
+                    if updated_slot.status != SlotStatus.FULL:
+                        updated_slot.status = SlotStatus.FULL
+                        db.commit()
                 
                 # Notify all participants (only real users, skip test users)
                 real_user_ids = [890859555, 999888777]  # Add real user IDs here (you + @petontyapa)
@@ -439,29 +447,44 @@ async def handle_min_participants(update: Update, context: ContextTypes.DEFAULT_
             # Add creator as participant
             SlotParticipantRepository.add_participant(db, slot.id, user_id)
             
-            # Check if should create room immediately (for min_participants=1)
+            # Reload slot to get updated participants count
             updated_slot = SlotRepository.get_by_id(db, slot.id)
+            
+            # Check if should create room immediately (if participants >= min_participants)
             if RoomManager.should_create_room(updated_slot):
-                # Create room
-                room = RoomRepository.create(db, slot.id)
-                updated_slot.status = SlotStatus.FULL
-                db.commit()
-                
-                # Create Telegram group
-                await RoomManager.create_room_for_slot(updated_slot, context.bot)
-                
-                await update.message.reply_text(
-                    f"🎉 Слот заполнен! Создаем группу...\n\n"
-                    f"🎬 Фильм: {updated_slot.movie.title}\n"
-                    f"📅 Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
-                    f"👥 Участники: {len(updated_slot.participants)}"
-                )
+                # Check if room already exists
+                existing_room = RoomRepository.get_by_slot_id(db, slot.id)
+                if not existing_room:
+                    # Create room
+                    room = RoomRepository.create(db, slot.id)
+                    updated_slot.status = SlotStatus.FULL
+                    db.commit()
+                    
+                    # Create Telegram group
+                    await RoomManager.create_room_for_slot(updated_slot, context.bot)
+                    
+                    await update.message.reply_text(
+                        f"🎉 Слот заполнен! Создаем группу...\n\n"
+                        f"🎬 Фильм: {updated_slot.movie.title}\n"
+                        f"📅 Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
+                        f"👥 Участники: {len(updated_slot.participants)}"
+                    )
+                else:
+                    # Room already exists, just notify
+                    await update.message.reply_text(
+                        f"✅ Слот создан!\n\n"
+                        f"🎬 Фильм: {updated_slot.movie.title}\n"
+                        f"📅 Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
+                        f"👥 Участники: {len(updated_slot.participants)}\n\n"
+                        f"💬 Комната уже создана для этого слота."
+                    )
             else:
                 await update.message.reply_text(
                     f"✅ Слот создан!\n\n"
                     f"Фильм: {slot.movie.title}\n"
                     f"Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
-                    f"Минимум участников: {min_participants}\n\n"
+                    f"Минимум участников: {min_participants}\n"
+                    f"Текущие участники: {len(updated_slot.participants)}\n\n"
                     "Ожидаем участников..."
                 )
         
