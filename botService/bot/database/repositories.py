@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime
 
-from bot.database.models import User, Movie, Slot, SlotParticipant, Room, Rating
+from bot.database.models import User, Movie, Slot, SlotParticipant, Room, Rating, UserKinopoisk, UserVote
 from bot.constants import SlotStatus, RoomStatus
 
 
@@ -123,6 +123,11 @@ class SlotRepository:
             Slot.movie_id == movie_id,
             Slot.status == SlotStatus.OPEN
         ).all()
+    
+    @staticmethod
+    def get_all_open(db: Session) -> List[Slot]:
+        """Get all open slots across all movies"""
+        return db.query(Slot).filter(Slot.status == SlotStatus.OPEN).all()
     
     @staticmethod
     def get_by_creator(db: Session, creator_id: int) -> List[Slot]:
@@ -250,4 +255,61 @@ class RatingRepository:
         ).all()}
         
         return [uid for uid in participants if uid != rater_id and uid not in rated_users]
+
+class UserKinopoiskRepository:
+    """Repository for mapping Telegram users to Kinopoisk user IDs"""
+    
+    @staticmethod
+    def get_by_user_id(db: Session, user_id: int) -> Optional[UserKinopoisk]:
+        return db.query(UserKinopoisk).filter(UserKinopoisk.user_id == user_id).first()
+    
+    @staticmethod
+    def set_kp_user_id(db: Session, user_id: int, kp_user_id: str) -> UserKinopoisk:
+        record = db.query(UserKinopoisk).filter(UserKinopoisk.user_id == user_id).first()
+        if record:
+            record.kp_user_id = kp_user_id
+        else:
+            record = UserKinopoisk(user_id=user_id, kp_user_id=kp_user_id)
+            db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record
+
+class UserVoteRepository:
+    """Repository for storing and querying user movie votes"""
+    
+    @staticmethod
+    def upsert_vote(db: Session, user_id: int, kinopoisk_id: str, title: Optional[str], 
+                    year: Optional[int], movie_type: Optional[str], user_rating: int,
+                    poster_url: Optional[str] = None) -> UserVote:
+        vote = db.query(UserVote).filter(
+            UserVote.user_id == user_id,
+            UserVote.kinopoisk_id == kinopoisk_id
+        ).first()
+        if vote:
+            vote.user_rating = user_rating
+            vote.title = title
+            vote.year = year
+            vote.type = movie_type
+            vote.poster_url = poster_url
+        else:
+            vote = UserVote(
+                user_id=user_id,
+                kinopoisk_id=kinopoisk_id,
+                title=title,
+                year=year,
+                type=movie_type,
+                user_rating=user_rating,
+                poster_url=poster_url
+            )
+            db.add(vote)
+        db.commit()
+        db.refresh(vote)
+        return vote
+    
+    @staticmethod
+    def get_user_votes_map(db: Session, user_id: int) -> dict[str, int]:
+        """Return {kinopoisk_id: user_rating} map for user"""
+        votes = db.query(UserVote).filter(UserVote.user_id == user_id).all()
+        return {v.kinopoisk_id: v.user_rating for v in votes}
 

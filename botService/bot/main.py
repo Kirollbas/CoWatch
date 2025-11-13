@@ -21,6 +21,8 @@ from bot.handlers.slots import (
 from bot.handlers.profile import profile_command, my_rooms_command
 from bot.handlers.rating import rate_command, rate_user_callback
 from bot.handlers.group import handle_bot_added_to_group
+from bot.handlers.kp import link_kp_command, handle_kp_id
+from bot.handlers.recommend import recommend_command
 from bot.utils.states import check_state
 
 # Configure logging
@@ -34,6 +36,11 @@ logger = logging.getLogger(__name__)
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle text messages based on user state"""
     user_id = update.effective_user.id
+    
+    # Check if user is sending Kinopoisk ID
+    if check_state(user_id, "waiting_for_kp_id"):
+        await handle_kp_id(update, context)
+        return
     
     # Check if user is waiting for movie URL
     if check_state(user_id, "waiting_for_movie_url"):
@@ -77,6 +84,8 @@ def main():
     application.add_handler(CommandHandler("profile", profile_command))
     application.add_handler(CommandHandler("rate", rate_command))
     application.add_handler(CommandHandler("cancel", cancel_command))
+    application.add_handler(CommandHandler("link_kp", link_kp_command))
+    application.add_handler(CommandHandler("recommend", recommend_command))
     
     # Register callback query handlers
     application.add_handler(CallbackQueryHandler(create_slot_callback, pattern=r"^create_slot:"))
