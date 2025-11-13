@@ -103,20 +103,41 @@ def ensure_schema():
         if insp.has_table("movies"):
             cols = {c["name"] for c in insp.get_columns("movies")}
             if "genres" not in cols:
-                ddl = "ALTER TABLE movies ADD COLUMN genres VARCHAR" if dialect != "sqlite" else "ALTER TABLE movies ADD COLUMN genres TEXT"
+                if dialect == "postgresql":
+                    ddl = "ALTER TABLE movies ADD COLUMN genres VARCHAR"
+                elif dialect == "sqlite":
+                    ddl = "ALTER TABLE movies ADD COLUMN genres TEXT"
+                else:
+                    ddl = "ALTER TABLE movies ADD COLUMN genres VARCHAR"
+                
                 with engine.connect() as conn:
                     conn.execute(text(ddl))
                     conn.commit()
                 logger.info("Added movies.genres column")
     except Exception as e:
         logger.warning(f"Schema check for movies.genres failed: {e}")
+        # Try to apply migration instead
+        try:
+            logger.info("Attempting to apply migrations to fix schema...")
+            alembic_cfg = AlembicConfig(str(project_root / "alembic.ini"))
+            alembic_cfg.set_main_option("sqlalchemy.url", Config.DATABASE_URL)
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Migrations applied successfully")
+        except Exception as migration_error:
+            logger.error(f"Failed to apply migrations: {migration_error}")
     
     # user_votes.genres
     try:
         if insp.has_table("user_votes"):
             cols = {c["name"] for c in insp.get_columns("user_votes")}
             if "genres" not in cols:
-                ddl = "ALTER TABLE user_votes ADD COLUMN genres VARCHAR" if dialect != "sqlite" else "ALTER TABLE user_votes ADD COLUMN genres TEXT"
+                if dialect == "postgresql":
+                    ddl = "ALTER TABLE user_votes ADD COLUMN genres VARCHAR"
+                elif dialect == "sqlite":
+                    ddl = "ALTER TABLE user_votes ADD COLUMN genres TEXT"
+                else:
+                    ddl = "ALTER TABLE user_votes ADD COLUMN genres VARCHAR"
+                
                 with engine.connect() as conn:
                     conn.execute(text(ddl))
                     conn.commit()

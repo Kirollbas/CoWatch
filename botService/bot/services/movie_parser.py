@@ -17,14 +17,37 @@ class MovieParser:
     @staticmethod
     def parse_url(url: str) -> Optional[Dict]:
         """Parse movie URL and return movie data"""
-        url = url.strip().lower()
+        url_lower = url.strip().lower()
+        original_url = url.strip()
 
-        if "kinopoisk" in url:
-            movie_id = MovieParser.extract_id_from_url(url, "kinopoisk")
-            return MovieParser._parse_kinopoisk(movie_id)
+        if "kinopoisk" in url_lower:
+            movie_id = MovieParser.extract_id_from_url(original_url, "kinopoisk")
+            if not movie_id:
+                logger.warning(f"Could not extract ID from URL: {url}")
+                return None
+            
+            # Try to parse with API
+            result = MovieParser._parse_kinopoisk(movie_id)
+            if result:
+                return result
+            
+            # Fallback: return basic data if API key is missing (for testing)
+            if not Config.KINOPOISK_API_KEY:
+                logger.warning(f"API key not set, returning basic data for ID {movie_id}")
+                return {
+                    "title": f"Фильм {movie_id}",
+                    "year": None,
+                    "type": MovieType.MOVIE,
+                    "kinopoisk_id": movie_id,
+                    "description": "Для получения полной информации настройте KINOPOISK_API_KEY в .env",
+                    "poster_url": None,
+                    "genres": None
+                }
+            
+            return None
 
-        elif "imdb" in url:
-            movie_id = MovieParser.extract_id_from_url(url, "imdb")
+        elif "imdb" in url_lower:
+            movie_id = MovieParser.extract_id_from_url(original_url, "imdb")
             return MovieParser._parse_imdb(movie_id)
 
         return None
@@ -69,22 +92,38 @@ class MovieParser:
     def _parse_kinopoisk(kinopoisk_id: str) -> Optional[Dict]:
         """Parse Kinopoisk ID by fetching from API"""
         if not kinopoisk_id:
+            logger.warning("No Kinopoisk ID provided")
             return None
 
         if not Config.KINOPOISK_API_KEY:
-            logger.warning("Kinopoisk API key not configured")
+            logger.error("Kinopoisk API key not configured. Please set KINOPOISK_API_KEY in .env file")
             return None
 
         headers = {"X-API-KEY": Config.KINOPOISK_API_KEY}
         url = f"{MovieParser.API_BASE_URL}/{kinopoisk_id}"
 
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code != 200:
-            logger.warning(f"Failed to fetch Kinopoisk {kinopoisk_id}: {resp.status_code}")
-            return None
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code != 200:
+                logger.error(f"Failed to fetch Kinopoisk {kinopoisk_id}: HTTP {resp.status_code}")
+                if resp.status_code == 401:
+                    logger.error("Invalid API key. Please check KINOPOISK_API_KEY in .env")
+                elif resp.status_code == 404:
+                    logger.error(f"Movie with ID {kinopoisk_id} not found")
+                return None
 
-        data = resp.json()
-        return MovieParser._map_kinopoisk_data(data)
+            data = resp.json()
+            if not data:
+                logger.error(f"Empty response from API for ID {kinopoisk_id}")
+                return None
+                
+            return MovieParser._map_kinopoisk_data(data)
+        except requests.RequestException as e:
+            logger.error(f"Network error while fetching Kinopoisk data: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error parsing Kinopoisk API response: {e}")
+            return None
     
     @staticmethod
     def _map_kinopoisk_data(data: Dict) -> Dict:

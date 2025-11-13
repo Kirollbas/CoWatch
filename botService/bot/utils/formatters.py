@@ -72,15 +72,35 @@ def format_slot_info(slot: Slot) -> str:
     return text
 
 
-def format_user_profile(user: User) -> str:
+def format_user_profile(
+    user: User, 
+    kp_user_id: str = None,
+    imported_votes_count: int = 0,
+    bot_ratings_given: int = 0
+) -> str:
     """Format user profile for display"""
     text = f"👤 <b>Профиль</b>\n\n"
     text += f"Имя: {user.first_name}\n"
     if user.username:
         text += f"Username: @{user.username}\n"
-    text += f"Рейтинг: {user.rating:.2f} ⭐\n"
-    text += f"Всего оценок: {user.total_ratings}\n"
-    text += f"Регистрация: {user.created_at.strftime('%d.%m.%Y')}"
+    
+    text += f"\n⭐ <b>Рейтинг в боте:</b> {user.rating:.2f} ⭐\n"
+    text += f"Получено оценок: {user.total_ratings}\n"
+    
+    # Kinopoisk section
+    text += f"\n🎬 <b>Кинопоиск:</b>\n"
+    if kp_user_id:
+        text += f"ID: {kp_user_id}\n"
+        text += f"Импортировано оценок: {imported_votes_count}\n"
+    else:
+        text += "Не привязан\n"
+        text += "Используйте /link_kp для привязки\n"
+    
+    # Bot ratings section
+    text += f"\n💬 <b>Оценки в боте:</b>\n"
+    text += f"Поставлено оценок другим: {bot_ratings_given}\n"
+    
+    text += f"\n📅 Регистрация: {user.created_at.strftime('%d.%m.%Y')}"
     return text
 
 

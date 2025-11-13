@@ -48,10 +48,42 @@ async def handle_movie_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db: Session = SessionLocal()
     try:
         # Parse movie data using Kinopoisk API
-        movie_data = MovieParser.parse_url(url)
+        try:
+            movie_data = MovieParser.parse_url(url)
+        except Exception as e:
+            logger.error(f"Error parsing movie URL: {e}", exc_info=True)
+            await update.message.reply_text(
+                "❌ Произошла ошибка при обработке ссылки.\n\n"
+                "Возможные причины:\n"
+                "• API ключ Kinopoisk не настроен\n"
+                "• Проблемы с сетью\n"
+                "• Неверный формат ссылки\n\n"
+                "Проверьте настройки в .env файле."
+            )
+            clear_state(user_id)
+            return
         
         if not movie_data:
-            await update.message.reply_text("❌ Не удалось обработать ссылку. Попробуйте другую.")
+            # Check if API key is missing
+            from bot.config import Config
+            if not Config.KINOPOISK_API_KEY:
+                await update.message.reply_text(
+                    "❌ Не удалось обработать ссылку.\n\n"
+                    "⚠️ API ключ Kinopoisk не настроен.\n\n"
+                    "Для работы с ссылками Kinopoisk необходимо:\n"
+                    "1. Получить API ключ на https://kinopoiskapiunofficial.tech/\n"
+                    "2. Добавить в .env файл:\n"
+                    "   KINOPOISK_API_KEY=ваш_ключ"
+                )
+            else:
+                await update.message.reply_text(
+                    "❌ Не удалось обработать ссылку.\n\n"
+                    "Возможные причины:\n"
+                    "• Фильм не найден в базе Kinopoisk\n"
+                    "• Проблемы с API\n"
+                    "• Неверный формат ссылки\n\n"
+                    "Попробуйте другую ссылку или проверьте логи."
+                )
             clear_state(user_id)
             return
         

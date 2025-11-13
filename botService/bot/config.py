@@ -38,7 +38,9 @@ class Config:
             )
         if not cls.DATABASE_URL:
             raise ValueError("DATABASE_URL is not set in environment variables")
+        
+        # Optional but recommended API keys
         if not cls.KINOPOISK_API_KEY:
-            raise ValueError("KINOPOISK_API_KEY is not set in environment variables")
+            print("⚠️  Warning: KINOPOISK_API_KEY is not set. Movie parsing from URLs will be limited.")
         if not cls.WATCH_TOGETHER_API_KEY:
-            raise ValueError("WATCH_TOGETHER_API_KEY is not set in environment variables")
+            print("⚠️  Warning: WATCH_TOGETHER_API_KEY is not set. Watch2Gether integration will be unavailable.")
