@@ -87,7 +87,7 @@ class Slot(Base):
     movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
     creator_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
     datetime = Column(DateTime, nullable=False)
-    min_participants = Column(Integer, default=2)
+    min_participants = Column(Integer, default=1)
     max_participants = Column(Integer, nullable=True)
     status = Column(SQLEnum(SlotStatus.OPEN, SlotStatus.FULL, SlotStatus.COMPLETED, name="slot_status"), 
                     default=SlotStatus.OPEN)
@@ -147,4 +147,5 @@ class Rating(Base):
     room = relationship("Room", back_populates="ratings")
     rater = relationship("User", back_populates="ratings_given", foreign_keys=[rater_id])
     rated = relationship("User", back_populates="ratings_received", foreign_keys=[rated_id])
+
 

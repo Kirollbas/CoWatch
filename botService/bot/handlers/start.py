@@ -64,10 +64,40 @@ async def handle_group_creation(update: Update, context: ContextTypes.DEFAULT_TY
         slot_id = int(param.split("_")[1])
         logger.info(f"Group creation requested for slot {slot_id}")
         
+        # Store slot_id in user context for later use in group setup
+        context.user_data['pending_slot_id'] = slot_id
+        
         # Get slot information
         slot = SlotRepository.get_by_id(db, slot_id)
         if not slot:
             await update.message.reply_text("❌ Слот не найден.")
+            return
+        
+        # Check if slot is still active and user is participant
+        user_id = update.effective_user.id
+        is_participant = any(p.user_id == user_id for p in slot.participants)
+        
+        if not is_participant:
+            await update.message.reply_text("❌ Вы не являетесь участником этого слота.")
+            return
+        
+        # Check if slot is already processed (room created)
+        if slot.status == "full":
+            await update.message.reply_text(
+                f"✅ Группа для этого слота уже создана!\n\n"
+                f"🎬 Фильм: {slot.movie.title}\n"
+                f"📅 Время: {slot.datetime.strftime('%d.%m.%Y в %H:%M')}\n\n"
+                f"Группа уже настроена и готова к использованию."
+            )
+            return
+        
+        # Check if slot is not open (can't create group)
+        if slot.status != "open":
+            await update.message.reply_text(
+                f"❌ Этот слот больше не доступен для создания группы.\n\n"
+                f"🎬 Фильм: {slot.movie.title}\n"
+                f"📊 Статус: {slot.status}"
+            )
             return
         
         # Create group creation instructions

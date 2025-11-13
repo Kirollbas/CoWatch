@@ -73,27 +73,32 @@ async def join_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Add participant
         SlotParticipantRepository.add_participant(db, slot_id, user_id)
         
+        # Reload slot to get updated participants count
+        updated_slot = SlotRepository.get_by_id(db, slot_id)
+        
         # Check if should create room
-        if RoomManager.should_create_room(slot):
+        if RoomManager.should_create_room(updated_slot):
             # Create room
             room = RoomRepository.create(db, slot_id)
-            slot.status = SlotStatus.FULL
+            updated_slot.status = SlotStatus.FULL
             db.commit()
             
             # Create Telegram group
-            await RoomManager.create_room_for_slot(slot, context.bot)
+            await RoomManager.create_room_for_slot(updated_slot, context.bot)
             
             # Notify creator
-            creator = UserRepository.get_by_id(db, slot.creator_id)
+            creator = UserRepository.get_by_id(db, updated_slot.creator_id)
             if creator:
                 await context.bot.send_message(
-                    chat_id=slot.creator_id,
-                    text=f"✅ Набралось достаточно участников для слота!\n\n{format_slot_info(slot)}",
+                    chat_id=updated_slot.creator_id,
+                    text=f"✅ Набралось достаточно участников для слота!\n\n{format_slot_info(updated_slot)}",
                     parse_mode="HTML"
                 )
         
+        # Use updated slot for final message
+        final_slot = updated_slot if 'updated_slot' in locals() else slot
         await query.edit_message_text(
-            f"✅ Вы присоединились к слоту!\n\n{format_slot_info(slot)}",
+            f"✅ Вы присоединились к слоту!\n\n{format_slot_info(final_slot)}",
             parse_mode="HTML"
         )
     except Exception as e:

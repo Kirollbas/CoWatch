@@ -3,9 +3,11 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from sqlalchemy.orm import Session
+import io
 
 from bot.database.session import SessionLocal
 from bot.database.repositories import SlotRepository
+from bot.services.kinopoisk_images_service import KinopoiskImagesService
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     db: Session = SessionLocal()
     
     try:
-        # Find active slots where this user is a participant
+        # Find the most recent slot that is ready for group creation where this user is a participant
         logger.info(f"🔍 Looking for active slots where user {creator_id} is a participant")
         slots = SlotRepository.get_user_participations(db, creator_id)
         logger.info(f"📊 Found {len(slots)} slots where user {creator_id} is a participant")
@@ -73,7 +75,10 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         active_slot = None
         
         # Find the most recent slot that is ready for group creation (full or open with enough participants)
-        for slot in slots:
+        # Sort by ID descending to get the newest slot first
+        sorted_slots = sorted(slots, key=lambda x: x.id, reverse=True)
+        
+        for slot in sorted_slots:
             logger.info(f"📅 Slot {slot.id}: status={slot.status}, participants={len(slot.participants)}/{slot.min_participants}")
             if (slot.status in ["open", "full"] and len(slot.participants) >= slot.min_participants):
                 active_slot = slot
@@ -91,6 +96,10 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             return
         
         logger.info(f"🎬 Setting up group for movie: {active_slot.movie.title}")
+        logger.info(f"🔍 DEBUG: Found slot ID: {active_slot.id}")
+        logger.info(f"🔍 DEBUG: Movie ID: {active_slot.movie.id}")
+        logger.info(f"🔍 DEBUG: Movie title: {active_slot.movie.title}")
+        logger.info(f"🔍 DEBUG: Movie Kinopoisk ID: {active_slot.movie.kinopoisk_id}")
         
         # Set up group for specific movie
         logger.info(f"🔧 Setting up group for movie: {active_slot.movie.title}")
@@ -110,6 +119,12 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             logger.info("✅ Set group description")
         except Exception as e:
             logger.warning(f"⚠️ Could not set group description: {e}")
+        
+        # Try to set movie poster as group avatar
+        await set_movie_poster_as_avatar(context, group_id, active_slot.movie.kinopoisk_id)
+        
+        # Enable chat history for new members
+        await enable_chat_history_for_new_members(context, group_id)
         
         # Create invite link
         logger.info(f"🔗 Creating invite link for group {group_id}")
@@ -212,3 +227,138 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         logger.error(f"Error setting up movie group: {e}")
     finally:
         db.close()
+
+
+async def set_movie_poster_as_avatar(context: ContextTypes.DEFAULT_TYPE, group_id: int, kinopoisk_id: str):
+    """Set movie poster as group avatar"""
+    try:
+        logger.info(f"🖼️ Attempting to set movie poster as avatar for group {group_id}")
+        logger.info(f"🎬 Movie Kinopoisk ID: {kinopoisk_id}")
+        
+        # Check if kinopoisk_id is valid
+        if not kinopoisk_id or kinopoisk_id == "None":
+            logger.warning(f"⚠️ Invalid Kinopoisk ID: {kinopoisk_id}")
+            return
+        
+        # Check bot permissions first
+        try:
+            bot_member = await context.bot.get_chat_member(group_id, context.bot.id)
+            if bot_member.status not in ['administrator', 'creator']:
+                logger.warning(f"⚠️ Bot is not admin in group {group_id}, cannot set photo")
+                return
+            
+            # Check if bot has permission to change group info
+            if hasattr(bot_member, 'can_change_info') and not bot_member.can_change_info:
+                logger.warning(f"⚠️ Bot doesn't have permission to change group info")
+                return
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Could not check bot permissions: {e}")
+            # Continue anyway, maybe it will work
+        
+        # Get the best poster URL
+        poster_url = KinopoiskImagesService.get_best_poster(kinopoisk_id)
+        
+        if not poster_url:
+            logger.warning(f"⚠️ No poster found for movie {kinopoisk_id}")
+            return
+        
+        logger.info(f"🔗 Found poster URL: {poster_url}")
+        
+        # Download the poster image
+        image_data = KinopoiskImagesService.download_image(poster_url)
+        
+        if not image_data:
+            logger.warning(f"⚠️ Failed to download poster from {poster_url}")
+            return
+        
+        logger.info(f"📥 Downloaded poster image ({len(image_data)} bytes)")
+        
+        # Create BytesIO object for Telegram
+        image_file = io.BytesIO(image_data)
+        image_file.name = "poster.jpg"
+        
+        # Set the group photo
+        await context.bot.set_chat_photo(chat_id=group_id, photo=image_file)
+        logger.info(f"✅ Successfully set movie poster as group avatar")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to set movie poster as avatar: {e}")
+        logger.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
+        
+        # Send message to group about the limitation
+        try:
+            await context.bot.send_message(
+                chat_id=group_id,
+                text="ℹ️ Не удалось установить постер фильма как аватарку группы.\n"
+                     "Для этого боту нужны права администратора с возможностью изменения информации о группе.",
+                parse_mode="Markdown"
+            )
+        except:
+            pass  # Don't fail if we can't send the message
+
+
+async def enable_chat_history_for_new_members(context: ContextTypes.DEFAULT_TYPE, group_id: int):
+    """Enable chat history visibility for new members"""
+    try:
+        logger.info(f"📜 Attempting to enable chat history for new members in group {group_id}")
+        
+        # Bot API cannot directly change "Chat History for new members" setting
+        # This setting can only be changed by group admins manually
+        # We'll send instructions to the group creator instead
+        
+        try:
+            await context.bot.send_message(
+                chat_id=group_id,
+                text="📜 **Настройка истории сообщений**\n\n"
+                     "ℹ️ Для лучшего опыта новых участников рекомендуется включить видимость истории сообщений:\n\n"
+                     "1️⃣ Откройте настройки группы\n"
+                     "2️⃣ Перейдите в раздел \"Разрешения\"\n"
+                     "3️⃣ Найдите \"Chat History for new members\"\n"
+                     "4️⃣ Установите значение \"Visible\"\n\n"
+                     "✅ Это позволит новым участникам видеть предыдущие сообщения и лучше понимать контекст обсуждения фильма.",
+                parse_mode="Markdown"
+            )
+            logger.info(f"✅ Sent chat history instructions to group {group_id}")
+        except Exception as msg_error:
+            logger.warning(f"⚠️ Could not send history instructions: {msg_error}")
+        
+        # Set basic permissions to ensure group functionality
+        from telegram import ChatPermissions
+        
+        try:
+            # Get current chat info
+            chat = await context.bot.get_chat(group_id)
+            logger.info(f"📊 Current chat type: {chat.type}")
+            
+            # For groups and supergroups, ensure basic permissions are set
+            if chat.type in ['group', 'supergroup']:
+                # Create standard permissions for movie discussion groups
+                permissions = ChatPermissions(
+                    can_send_messages=True,
+                    can_send_media_messages=True,
+                    can_send_polls=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                    can_change_info=False,
+                    can_invite_users=True,
+                    can_pin_messages=False
+                )
+                
+                # Set the permissions
+                await context.bot.set_chat_permissions(group_id, permissions)
+                logger.info(f"✅ Set standard chat permissions for movie discussion")
+                
+            else:
+                logger.info(f"ℹ️ Chat type {chat.type} doesn't support permission modifications")
+                
+        except Exception as perm_error:
+            logger.warning(f"⚠️ Could not set chat permissions: {perm_error}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to configure chat history settings: {e}")
+        logger.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
+        
+        # This is not a critical error, so we continue with group setup
+        logger.info("ℹ️ Continuing with group setup despite history setting failure")
+

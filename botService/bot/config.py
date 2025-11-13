@@ -16,7 +16,7 @@ class Config:
         if not DATABASE_URL.startswith("sqlite"):
             DATABASE_URL = "sqlite:///./cowatch.db"
     
-    MIN_PARTICIPANTS_DEFAULT = int(os.getenv("MIN_PARTICIPANTS_DEFAULT", "2"))
+    MIN_PARTICIPANTS_DEFAULT = int(os.getenv("MIN_PARTICIPANTS_DEFAULT", "1"))
     
     # Kinopoisk API configuration
     KINOPOISK_API_KEY = os.getenv("KINOPOISK_API_KEY")
