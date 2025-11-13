@@ -12,7 +12,8 @@ class RoomManager:
     def should_create_room(slot: Slot) -> bool:
         """Check if room should be created for slot"""
         participants_count = len(slot.participants)
-        return participants_count >= slot.min_participants and slot.status == "open"
+        # Room should be created when we have enough participants and slot is not yet processed
+        return participants_count >= slot.min_participants and slot.status in ["open", "full"]
     
     @staticmethod
     async def create_room_for_slot(slot: Slot, bot) -> Room:
@@ -49,9 +50,12 @@ class RoomManager:
                         participants_info.append(f"• {user_info.first_name}")
                 except Exception as e:
                     logger.warning(f"Could not get info for user {participant.user_id}: {e}")
-                    # Специальная обработка для известных тестовых пользователей
-                    if participant.user_id == 999888777:
-                        participants_info.append(f"• @petontyapa")
+                    # Fallback to user data from database
+                    user = participant.user
+                    if user and user.username:
+                        participants_info.append(f"• @{user.username} ({user.first_name})")
+                    elif user and user.first_name:
+                        participants_info.append(f"• {user.first_name}")
                     else:
                         participants_info.append(f"• User {participant.user_id}")
             
@@ -96,9 +100,6 @@ class RoomManager:
                 logger.info(f"✅ Sent group creation request to user {last_participant.user_id}")
                 
                 # Отправляем остальным участникам уведомление о том, что группа создается
-                # Но только реальным пользователям (не тестовым)
-                real_user_ids = [890859555]  # Только ваш реальный ID
-                
                 waiting_msg = f"""🎉 **Слот заполнен!**
 
 🎬 **Фильм:** {slot.movie.title}
@@ -114,20 +115,17 @@ class RoomManager:
 
 🍿 **Приятного просмотра!**"""
                 
-                # Отправляем только реальным участникам
+                # Отправляем всем остальным участникам
                 for participant in other_participants:
-                    if participant.user_id in real_user_ids:
-                        try:
-                            await bot.send_message(
-                                chat_id=participant.user_id,
-                                text=waiting_msg,
-                                parse_mode="Markdown"
-                            )
-                            logger.info(f"✅ Sent waiting message to user {participant.user_id}")
-                        except Exception as e:
-                            logger.error(f"❌ Failed to send waiting message to user {participant.user_id}: {e}")
-                    else:
-                        logger.info(f"ℹ️ Skipping test user {participant.user_id}")
+                    try:
+                        await bot.send_message(
+                            chat_id=participant.user_id,
+                            text=waiting_msg,
+                            parse_mode="Markdown"
+                        )
+                        logger.info(f"✅ Sent waiting message to user {participant.user_id}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to send waiting message to user {participant.user_id}: {e}")
                 
                 # Сохраняем информацию о слоте для последующей обработки
                 # Когда пользователь создаст группу, бот получит уведомление
@@ -148,7 +146,7 @@ class RoomManager:
         """Send enhanced notification with participant contacts"""
         logger.info(f"Sending enhanced room notifications for slot {slot.id}")
         
-        # Collect participant information with proper @petontyapa display
+        # Collect participant information
         participants_info = []
         for participant in slot.participants:
             try:
@@ -156,12 +154,15 @@ class RoomManager:
                 if user_info.username:
                     participants_info.append(f"• @{user_info.username} ({user_info.first_name})")
                 else:
-                    participants_info.append(f"• {user_info.first_name} (ID: {participant.user_id})")
+                    participants_info.append(f"• {user_info.first_name}")
             except Exception as e:
                 logger.warning(f"Could not get info for user {participant.user_id}: {e}")
-                # Special handling for known test users
-                if participant.user_id == 999888777:
-                    participants_info.append(f"• @petontyapa")
+                # Fallback to user data from database
+                user = participant.user
+                if user and user.username:
+                    participants_info.append(f"• @{user.username} ({user.first_name})")
+                elif user and user.first_name:
+                    participants_info.append(f"• {user.first_name}")
                 else:
                     participants_info.append(f"• User {participant.user_id}")
         
@@ -190,6 +191,9 @@ class RoomManager:
 🍿 **Приятного просмотра!**"""
         
         # Send notification to all participants
+        sent_count = 0
+        failed_count = 0
+        
         for participant in slot.participants:
             try:
                 await bot.send_message(
@@ -198,8 +202,12 @@ class RoomManager:
                     parse_mode="Markdown"
                 )
                 logger.info(f"✅ Sent enhanced notification to user {participant.user_id}")
+                sent_count += 1
             except Exception as e:
-                logger.error(f"Failed to notify user {participant.user_id}: {e}")
+                logger.error(f"❌ Failed to notify user {participant.user_id}: {e}")
+                failed_count += 1
+        
+        logger.info(f"📊 Fallback notification summary: {sent_count} sent, {failed_count} failed")
         
         return slot.room if slot.room else None
     

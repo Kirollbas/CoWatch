@@ -14,6 +14,11 @@ class WatchTogetherService:
 
     @staticmethod
     def create_wt_room(db: Session, slot: Slot) -> Optional[str]:
+        # Check if API key is configured
+        if not Config.WATCH_TOGETHER_API_KEY:
+            logger.warning(f"Watch Together API key not configured, skipping room creation for slot {slot.id}")
+            return None
+            
         movie = MovieRepository.get_by_id(db, slot.movie_id)
         if not movie:
             logger.error(f"Movie with movie_id={slot.movie_id} not found")

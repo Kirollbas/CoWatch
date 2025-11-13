@@ -8,6 +8,7 @@ import io
 from bot.database.session import SessionLocal
 from bot.database.repositories import SlotRepository, RoomRepository
 from bot.services.kinopoisk_images_service import KinopoiskImagesService
+from bot.services.watch_together_service import WatchTogetherService
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +154,18 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         # Enable chat history for new members
         await enable_chat_history_for_new_members(context, group_id)
         
+        # Create Watch Together room
+        logger.info(f"🎬 Creating Watch Together room for slot {active_slot.id}")
+        wt_room_url = None
+        try:
+            wt_room_url = WatchTogetherService.create_wt_room(db, active_slot)
+            if wt_room_url:
+                logger.info(f"✅ Watch Together room created: {wt_room_url}")
+            else:
+                logger.warning(f"⚠️ Failed to create Watch Together room for slot {active_slot.id}")
+        except Exception as e:
+            logger.error(f"❌ Error creating Watch Together room: {e}")
+        
         # Create invite link
         logger.info(f"🔗 Creating invite link for group {group_id}")
         try:
@@ -164,7 +177,26 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             
             logger.info(f"✅ Created invite link: {invite_link.invite_link}")
             
+            # Get participants info from database
+            logger.info(f"📤 Preparing participants list for {len(active_slot.participants)} participants")
+            participants_info = []
+            for participant in active_slot.participants:
+                user = participant.user  # Use the relationship to get User data
+                if user.username:
+                    participants_info.append(f"• @{user.username} ({user.first_name})")
+                else:
+                    participants_info.append(f"• {user.first_name}")
+                logger.info(f"✅ Added participant: {user.first_name} (ID: {user.id})")
+            
             # Send success message to group with participants list
+            wt_section = ""
+            if wt_room_url:
+                wt_section = f"""
+🎥 **Watch Together комната:**
+{wt_room_url}
+
+"""
+            
             success_msg = f"""✅ **Группа настроена!**
 
 🎬 **Фильм:** {active_slot.movie.title}
@@ -173,8 +205,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 👥 **Список участников:**
 {chr(10).join(participants_info)}
-
-🔗 **Ссылка-приглашение создана!**
+{wt_section}🔗 **Ссылка-приглашение создана!**
 Отправляю её всем участникам слота...
 
 🍿 **Приятного просмотра!**"""
@@ -187,27 +218,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             logger.info(f"✅ Sent success message to group with participants list")
             
             # Send invite link to all slot participants
-            logger.info(f"📤 Preparing to send invites to {len(active_slot.participants)} participants")
-            participants_info = []
-            for participant in active_slot.participants:
-                try:
-                    user_info = await context.bot.get_chat(participant.user_id)
-                    if user_info.username:
-                        participants_info.append(f"• @{user_info.username} ({user_info.first_name})")
-                    else:
-                        participants_info.append(f"• {user_info.first_name}")
-                    logger.info(f"✅ Got user info for {participant.user_id}: {user_info.first_name}")
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not get user info for {participant.user_id}: {e}")
-                    # Fallback names for known test users
-                    if participant.user_id == 999888777:
-                        participants_info.append(f"• @petontyapa")
-                    elif participant.user_id == 890859555:
-                        participants_info.append(f"• @attachsir")
-                    elif participant.user_id == 778097765:
-                        participants_info.append(f"• @petontyapa")
-                    else:
-                        participants_info.append(f"• Пользователь {participant.user_id}")
+            logger.info(f"📨 Sending invites to participants...")
             
             invite_msg = f"""🎉 **Группа создана!**
 
@@ -220,14 +231,16 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 👥 **Участники группы:**
 {chr(10).join(participants_info)}
-
-✅ **Группа готова к использованию!**
+{wt_section}✅ **Группа готова к использованию!**
 Переходите по ссылке и обсуждайте фильм.
 
 🍿 **Приятного просмотра!**"""
             
             # Send to all participants except the creator
-            logger.info(f"📨 Sending invites to participants...")
+            logger.info(f"📨 Sending invites to {len(active_slot.participants)} participants...")
+            
+            sent_count = 0
+            failed_count = 0
             
             for participant in active_slot.participants:
                 logger.info(f"🔍 Processing participant {participant.user_id}, creator: {creator_id}")
@@ -240,11 +253,15 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                             parse_mode="Markdown"
                         )
                         logger.info(f"✅ Sent group invite to user {participant.user_id}")
+                        sent_count += 1
                     except Exception as e:
                         logger.error(f"❌ Failed to send invite to user {participant.user_id}: {e}")
                         logger.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
+                        failed_count += 1
                 else:
                     logger.info(f"ℹ️ Skipping creator {participant.user_id}")
+            
+            logger.info(f"📊 Invite sending summary: {sent_count} sent, {failed_count} failed")
             
             logger.info(f"🎉 Group setup completed successfully!")
             

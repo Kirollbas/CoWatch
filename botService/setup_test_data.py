@@ -10,7 +10,7 @@ from bot.database.repositories import UserRepository, MovieRepository, SlotRepos
 from bot.constants import MovieType
 from datetime import datetime, timedelta
 
-def setup_test_data():
+def setup_test_data(main_user_id=890859555, main_username="kirbot314", main_first_name="Кирилл"):
     """Create test users, movies, and slots for testing"""
     print("🔧 Setting up test data...")
     
@@ -19,8 +19,8 @@ def setup_test_data():
         # Create test users with different ratings
         print("👥 Creating test users...")
         
-        # Main user (you) - реальный пользователь
-        main_user = UserRepository.get_or_create(db, 890859555, "kirbot314", "Кирилл")
+        # Main user - реальный пользователь (можно передать свой ID)
+        main_user = UserRepository.get_or_create(db, main_user_id, main_username, main_first_name)
         main_user.rating = 4.0
         main_user.total_ratings = 3
         
@@ -30,7 +30,7 @@ def setup_test_data():
         test_user.total_ratings = 5
         
         db.commit()
-        print(f"✅ Created users: Кирилл (4.0⭐), Тестовый пользователь (4.2⭐)")
+        print(f"✅ Created users: {main_first_name} (4.0⭐), Тестовый пользователь (4.2⭐)")
         
         # Create test movies
         print("🎬 Creating test movies...")
@@ -88,4 +88,19 @@ def setup_test_data():
         db.close()
 
 if __name__ == "__main__":
-    setup_test_data()
+    import sys
+    
+    # Можно передать свой user_id как аргумент
+    if len(sys.argv) > 1:
+        try:
+            user_id = int(sys.argv[1])
+            username = sys.argv[2] if len(sys.argv) > 2 else "user"
+            first_name = sys.argv[3] if len(sys.argv) > 3 else "User"
+            setup_test_data(user_id, username, first_name)
+        except (ValueError, IndexError):
+            print("Usage: python setup_test_data.py [user_id] [username] [first_name]")
+            print("Example: python setup_test_data.py 123456789 myusername 'My Name'")
+            sys.exit(1)
+    else:
+        # Используем значения по умолчанию
+        setup_test_data()
