@@ -12,7 +12,8 @@ class RoomManager:
     def should_create_room(slot: Slot) -> bool:
         """Check if room should be created for slot"""
         participants_count = len(slot.participants)
-        return participants_count >= slot.min_participants and slot.status == "open"
+        # Room should be created when we have enough participants and slot is not yet processed
+        return participants_count >= slot.min_participants and slot.status in ["open", "full"]
     
     @staticmethod
     async def create_room_for_slot(slot: Slot, bot) -> Room:
