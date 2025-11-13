@@ -67,7 +67,7 @@ def setup_test_data():
             movie_id=movie1.id,
             creator_id=test_user.id,
             datetime_obj=target_time,
-            min_participants=2  # Нужно 2 участника, чтобы ваше присоединение создало комнату
+            min_participants=1  # Нужен 1 участник для тестирования
         )
         SlotParticipantRepository.add_participant(db, slot1.id, test_user.id)
         

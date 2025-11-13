@@ -67,6 +67,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_movie_url(update, context)
         return
     
+    # Check if message is a movie URL
+    from bot.utils.validators import validate_movie_url
+    if validate_movie_url(update.message.text):
+        # Automatically handle movie URL
+        await handle_movie_url(update, context)
+        return
+    
     # Default: echo message
     await update.message.reply_text(
         "Используйте команды для работы с ботом. /help - справка."

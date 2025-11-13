@@ -351,8 +351,8 @@ async def handle_min_participants(update: Update, context: ContextTypes.DEFAULT_
     if update.message.text and update.message.text.strip() != "/skip":
         try:
             min_participants = int(update.message.text.strip())
-            if min_participants < 2:
-                await update.message.reply_text("❌ Минимум участников должен быть не менее 2.")
+            if min_participants < 1:
+                await update.message.reply_text("❌ Минимум участников должен быть не менее 1.")
                 return
         except ValueError:
             await update.message.reply_text("❌ Введите число.")
@@ -439,13 +439,31 @@ async def handle_min_participants(update: Update, context: ContextTypes.DEFAULT_
             # Add creator as participant
             SlotParticipantRepository.add_participant(db, slot.id, user_id)
             
-            await update.message.reply_text(
-                f"✅ Слот создан!\n\n"
-                f"Фильм: {slot.movie.title}\n"
-                f"Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
-                f"Минимум участников: {min_participants}\n\n"
-                "Ожидаем участников..."
-            )
+            # Check if should create room immediately (for min_participants=1)
+            updated_slot = SlotRepository.get_by_id(db, slot.id)
+            if RoomManager.should_create_room(updated_slot):
+                # Create room
+                room = RoomRepository.create(db, slot.id)
+                updated_slot.status = SlotStatus.FULL
+                db.commit()
+                
+                # Create Telegram group
+                await RoomManager.create_room_for_slot(updated_slot, context.bot)
+                
+                await update.message.reply_text(
+                    f"🎉 Слот заполнен! Создаем группу...\n\n"
+                    f"🎬 Фильм: {updated_slot.movie.title}\n"
+                    f"📅 Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
+                    f"👥 Участники: {len(updated_slot.participants)}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"✅ Слот создан!\n\n"
+                    f"Фильм: {slot.movie.title}\n"
+                    f"Время: {datetime_obj.strftime('%d.%m.%Y %H:%M')}\n"
+                    f"Минимум участников: {min_participants}\n\n"
+                    "Ожидаем участников..."
+                )
         
         clear_state(user_id)
     except Exception as e:

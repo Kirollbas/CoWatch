@@ -175,7 +175,7 @@ class SlotRepository:
     
     @staticmethod
     def create(db: Session, movie_id: int, creator_id: int, datetime_obj: datetime,
-              min_participants: int = 2, max_participants: Optional[int] = None) -> Slot:
+              min_participants: int = 1, max_participants: Optional[int] = None) -> Slot:
         """Create a new slot"""
         slot = Slot(
             movie_id=movie_id,
@@ -629,4 +629,5 @@ class UserVoteRepository:
         """Return {kinopoisk_id: user_rating} map for user"""
         votes = db.query(UserVote).filter(UserVote.user_id == user_id).all()
         return {v.kinopoisk_id: v.user_rating for v in votes}
+
 
