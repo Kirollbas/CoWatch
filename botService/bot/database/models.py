@@ -35,13 +35,31 @@ class Movie(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String, nullable=False)
+    name_original = Column(String, nullable=True)  # Оригинальное название
     year = Column(Integer, nullable=True)
     type = Column(SQLEnum(MovieType.MOVIE, MovieType.SERIES, name="movie_type"), nullable=False)
     kinopoisk_id = Column(String, nullable=True)
     imdb_id = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     poster_url = Column(String, nullable=True)
+    
+    # Kinopoisk API ratings
+    rating = Column(Float, nullable=True)               # Общий рейтинг
+    rating_kinopoisk = Column(Float, nullable=True)     # Рейтинг Кинопоиска
+    rating_imdb = Column(Float, nullable=True)          # Рейтинг IMDb
+    rating_film_critics = Column(Float, nullable=True)  # Рейтинг кинокритиков
+    rating_await = Column(Float, nullable=True)         # Ожидаемый рейтинг
+    rating_rf_critics = Column(Float, nullable=True)    # Рейтинг российских кинокритиков
+    
+    # Additional metadata from Kinopoisk API
+    film_length = Column(Integer, nullable=True)        # Длительность в минутах
+    age_rating = Column(String, nullable=True)          # Возрастной рейтинг (например, "18+")
+    slogan = Column(String, nullable=True)              # Слоган фильма
+    countries = Column(String, nullable=True)           # JSON строка со странами
+    genres = Column(String, nullable=True)              # JSON строка с жанрами
+    
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    updated_at = Column(DateTime, nullable=True, onupdate=lambda: datetime.utcnow())  # Время последнего обновления из API
     
     # Relationships
     slots = relationship("Slot", back_populates="movie")

@@ -109,6 +109,7 @@ class MovieParser:
             
             # Extract relevant information
             title = data.get('nameRu') or data.get('nameEn') or data.get('nameOriginal')
+            name_original = data.get('nameOriginal')
             year = data.get('year')
             description = data.get('description') or data.get('shortDescription')
             poster_url = data.get('posterUrl')
@@ -118,15 +119,60 @@ class MovieParser:
             if data.get('type') == 'TV_SERIES':
                 movie_type = "series"
             
+            # Extract ratings
+            rating_data = data.get('rating', {})
+            rating = None
+            rating_kinopoisk = None
+            rating_imdb = None
+            rating_film_critics = None
+            rating_await = None
+            rating_rf_critics = None
+            
+            if isinstance(rating_data, dict):
+                rating = rating_data.get('kp') or rating_data.get('rating')
+                rating_kinopoisk = rating_data.get('kp')
+                rating_imdb = rating_data.get('imdb')
+                rating_film_critics = rating_data.get('filmCritics')
+                rating_await = rating_data.get('await')
+                rating_rf_critics = rating_data.get('russianFilmCritics')
+            
+            # Extract additional metadata
+            film_length = data.get('filmLength')
+            age_rating = data.get('ageRating')
+            slogan = data.get('slogan')
+            
+            # Extract countries and genres as JSON strings
+            countries = None
+            genres = None
+            if data.get('countries'):
+                import json
+                countries = json.dumps([c.get('country', '') for c in data['countries']], ensure_ascii=False)
+            if data.get('genres'):
+                import json
+                genres = json.dumps([g.get('genre', '') for g in data['genres']], ensure_ascii=False)
+            
             if title:
                 logger.info(f"Successfully fetched from API: {title} ({year})")
                 return {
                     "title": title,
+                    "name_original": name_original,
                     "year": year,
                     "type": movie_type,
                     "kinopoisk_id": movie_id,
                     "description": description or "Описание не найдено",
-                    "poster_url": poster_url
+                    "poster_url": poster_url,
+                    "rating": rating,
+                    "rating_kinopoisk": rating_kinopoisk,
+                    "rating_imdb": rating_imdb,
+                    "rating_film_critics": rating_film_critics,
+                    "rating_await": rating_await,
+                    "rating_rf_critics": rating_rf_critics,
+                    "film_length": film_length,
+                    "age_rating": age_rating,
+                    "slogan": slogan,
+                    "countries": countries,
+                    "genres": genres,
+                    "api_data": data  # Полные данные для update_from_api
                 }
             else:
                 logger.warning(f"No title found in API response for ID {movie_id}")

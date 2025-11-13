@@ -5,13 +5,57 @@ from bot.database.models import Movie, Slot, User, Room
 def format_movie_info(movie: Movie) -> str:
     """Format movie information for display"""
     text = f"🎬 <b>{movie.title}</b>"
+    if movie.name_original and movie.name_original != movie.title:
+        text += f" ({movie.name_original})"
     if movie.year:
         text += f" ({movie.year})"
     text += f"\nТип: {movie.type}"
+    
+    # Ratings
+    ratings_parts = []
+    if movie.rating_kinopoisk:
+        ratings_parts.append(f"Кинопоиск: {movie.rating_kinopoisk:.1f} ⭐")
+    if movie.rating_imdb:
+        ratings_parts.append(f"IMDb: {movie.rating_imdb:.1f} ⭐")
+    if movie.rating:
+        ratings_parts.append(f"Общий: {movie.rating:.1f} ⭐")
+    
+    if ratings_parts:
+        text += "\n" + " | ".join(ratings_parts)
+    
+    # Additional metadata
+    metadata_parts = []
+    if movie.film_length:
+        hours = movie.film_length // 60
+        minutes = movie.film_length % 60
+        if hours > 0:
+            metadata_parts.append(f"⏱ {hours}ч {minutes}м")
+        else:
+            metadata_parts.append(f"⏱ {minutes}м")
+    if movie.age_rating:
+        metadata_parts.append(f"🔞 {movie.age_rating}")
+    
+    if metadata_parts:
+        text += "\n" + " | ".join(metadata_parts)
+    
+    # Genres and countries
+    if movie.genres:
+        import json
+        try:
+            genres_list = json.loads(movie.genres)
+            if genres_list:
+                text += f"\n🎭 {', '.join(genres_list[:3])}"  # Показываем первые 3 жанра
+        except:
+            pass
+    
+    if movie.slogan:
+        text += f"\n💬 <i>{movie.slogan}</i>"
+    
     if movie.description:
         text += f"\n\n{movie.description[:200]}"
         if len(movie.description) > 200:
             text += "..."
+    
     return text
 
 

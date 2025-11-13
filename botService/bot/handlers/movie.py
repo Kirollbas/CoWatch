@@ -72,8 +72,23 @@ async def handle_movie_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 kinopoisk_id=movie_data.get("kinopoisk_id"),
                 imdb_id=movie_data.get("imdb_id"),
                 description=movie_data.get("description"),
-                poster_url=movie_data.get("poster_url")
+                poster_url=movie_data.get("poster_url"),
+                name_original=movie_data.get("name_original"),
+                rating=movie_data.get("rating"),
+                rating_kinopoisk=movie_data.get("rating_kinopoisk"),
+                rating_imdb=movie_data.get("rating_imdb"),
+                rating_film_critics=movie_data.get("rating_film_critics"),
+                rating_await=movie_data.get("rating_await"),
+                rating_rf_critics=movie_data.get("rating_rf_critics"),
+                film_length=movie_data.get("film_length"),
+                age_rating=movie_data.get("age_rating"),
+                slogan=movie_data.get("slogan"),
+                countries=movie_data.get("countries"),
+                genres=movie_data.get("genres")
             )
+        elif movie_data.get("api_data"):
+            # Update existing movie with full API data if available
+            MovieRepository.update_from_api(db, movie, movie_data["api_data"])
         
         # Show movie info and available slots
         from bot.database.repositories import UserRepository

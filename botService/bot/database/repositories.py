@@ -1,6 +1,6 @@
 """Repository pattern for database operations"""
 from sqlalchemy.orm import Session
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from datetime import datetime
 
 from bot.database.models import (
@@ -63,16 +63,40 @@ class MovieRepository:
     def create(db: Session, title: str, year: Optional[int] = None, 
               movie_type: str = "movie", kinopoisk_id: Optional[str] = None,
               imdb_id: Optional[str] = None, description: Optional[str] = None,
-              poster_url: Optional[str] = None) -> Movie:
+              poster_url: Optional[str] = None,
+              name_original: Optional[str] = None,
+              rating: Optional[float] = None,
+              rating_kinopoisk: Optional[float] = None,
+              rating_imdb: Optional[float] = None,
+              rating_film_critics: Optional[float] = None,
+              rating_await: Optional[float] = None,
+              rating_rf_critics: Optional[float] = None,
+              film_length: Optional[int] = None,
+              age_rating: Optional[str] = None,
+              slogan: Optional[str] = None,
+              countries: Optional[str] = None,
+              genres: Optional[str] = None) -> Movie:
         """Create a new movie"""
         movie = Movie(
             title=title,
+            name_original=name_original,
             year=year,
             type=movie_type,
             kinopoisk_id=kinopoisk_id,
             imdb_id=imdb_id,
             description=description,
-            poster_url=poster_url
+            poster_url=poster_url,
+            rating=rating,
+            rating_kinopoisk=rating_kinopoisk,
+            rating_imdb=rating_imdb,
+            rating_film_critics=rating_film_critics,
+            rating_await=rating_await,
+            rating_rf_critics=rating_rf_critics,
+            film_length=film_length,
+            age_rating=age_rating,
+            slogan=slogan,
+            countries=countries,
+            genres=genres
         )
         db.add(movie)
         db.commit()
@@ -93,6 +117,56 @@ class MovieRepository:
     def find_by_imdb_id(db: Session, imdb_id: str) -> Optional[Movie]:
         """Find movie by IMDb ID"""
         return db.query(Movie).filter(Movie.imdb_id == imdb_id).first()
+    
+    @staticmethod
+    def update_from_api(db: Session, movie: Movie, api_data: Dict) -> Movie:
+        """Update movie data from Kinopoisk API response"""
+        from datetime import datetime
+        
+        # Update basic fields
+        if api_data.get("nameRu"):
+            movie.title = api_data["nameRu"]
+        if api_data.get("nameOriginal"):
+            movie.name_original = api_data["nameOriginal"]
+        if api_data.get("year"):
+            movie.year = api_data["year"]
+        if api_data.get("description") or api_data.get("shortDescription"):
+            movie.description = api_data.get("description") or api_data.get("shortDescription")
+        if api_data.get("posterUrl"):
+            movie.poster_url = api_data["posterUrl"]
+        
+        # Update ratings
+        rating_data = api_data.get("rating", {})
+        if isinstance(rating_data, dict):
+            movie.rating = rating_data.get("kp") or rating_data.get("rating")
+            movie.rating_kinopoisk = rating_data.get("kp")
+            movie.rating_imdb = rating_data.get("imdb")
+            movie.rating_film_critics = rating_data.get("filmCritics")
+            movie.rating_await = rating_data.get("await")
+            movie.rating_rf_critics = rating_data.get("russianFilmCritics")
+        
+        # Update additional metadata
+        if api_data.get("filmLength"):
+            movie.film_length = api_data["filmLength"]
+        if api_data.get("ageRating"):
+            movie.age_rating = api_data["ageRating"]
+        if api_data.get("slogan"):
+            movie.slogan = api_data["slogan"]
+        
+        # Store countries and genres as JSON strings
+        if api_data.get("countries"):
+            import json
+            movie.countries = json.dumps([c.get("country", "") for c in api_data["countries"]], ensure_ascii=False)
+        if api_data.get("genres"):
+            import json
+            movie.genres = json.dumps([g.get("genre", "") for g in api_data["genres"]], ensure_ascii=False)
+        
+        # Update timestamp
+        movie.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(movie)
+        return movie
 
 
 class SlotRepository:
