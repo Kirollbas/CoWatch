@@ -8,6 +8,7 @@ import io
 from bot.database.session import SessionLocal
 from bot.database.repositories import SlotRepository
 from bot.services.kinopoisk_images_service import KinopoiskImagesService
+from bot.services.watch_together_service import WatchTogetherService
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,18 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         # Enable chat history for new members
         await enable_chat_history_for_new_members(context, group_id)
         
+        # Create Watch Together room
+        logger.info(f"🎬 Creating Watch Together room for slot {active_slot.id}")
+        wt_room_url = None
+        try:
+            wt_room_url = WatchTogetherService.create_wt_room(db, active_slot)
+            if wt_room_url:
+                logger.info(f"✅ Watch Together room created: {wt_room_url}")
+            else:
+                logger.warning(f"⚠️ Failed to create Watch Together room for slot {active_slot.id}")
+        except Exception as e:
+            logger.error(f"❌ Error creating Watch Together room: {e}")
+        
         # Create invite link
         logger.info(f"🔗 Creating invite link for group {group_id}")
         try:
@@ -138,6 +151,14 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             logger.info(f"✅ Created invite link: {invite_link.invite_link}")
             
             # Send success message to group with participants list
+            wt_section = ""
+            if wt_room_url:
+                wt_section = f"""
+🎥 **Watch Together комната:**
+{wt_room_url}
+
+"""
+            
             success_msg = f"""✅ **Группа настроена!**
 
 🎬 **Фильм:** {active_slot.movie.title}
@@ -146,8 +167,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 👥 **Список участников:**
 {chr(10).join(participants_info)}
-
-🔗 **Ссылка-приглашение создана!**
+{wt_section}🔗 **Ссылка-приглашение создана!**
 Отправляю её всем участникам слота...
 
 🍿 **Приятного просмотра!**"""
@@ -193,8 +213,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 👥 **Участники группы:**
 {chr(10).join(participants_info)}
-
-✅ **Группа готова к использованию!**
+{wt_section}✅ **Группа готова к использованию!**
 Переходите по ссылке и обсуждайте фильм.
 
 🍿 **Приятного просмотра!**"""

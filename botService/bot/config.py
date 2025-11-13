@@ -36,5 +36,6 @@ class Config:
             raise ValueError("DATABASE_URL is not set in environment variables")
         if not cls.KINOPOISK_API_KEY:
             raise ValueError("KINOPOISK_API_KEY is not set in environment variables")
+        # Watch Together API key is optional for testing
         if not cls.WATCH_TOGETHER_API_KEY:
-            raise ValueError("WATCH_TOGETHER_API_KEY is not set in environment variables")
+            print("⚠️ WATCH_TOGETHER_API_KEY is not set - Watch Together functionality will be disabled")
