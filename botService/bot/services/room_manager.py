@@ -96,9 +96,6 @@ class RoomManager:
                 logger.info(f"✅ Sent group creation request to user {last_participant.user_id}")
                 
                 # Отправляем остальным участникам уведомление о том, что группа создается
-                # Но только реальным пользователям (не тестовым)
-                real_user_ids = [890859555]  # Только ваш реальный ID
-                
                 waiting_msg = f"""🎉 **Слот заполнен!**
 
 🎬 **Фильм:** {slot.movie.title}
@@ -114,20 +111,17 @@ class RoomManager:
 
 🍿 **Приятного просмотра!**"""
                 
-                # Отправляем только реальным участникам
+                # Отправляем всем остальным участникам
                 for participant in other_participants:
-                    if participant.user_id in real_user_ids:
-                        try:
-                            await bot.send_message(
-                                chat_id=participant.user_id,
-                                text=waiting_msg,
-                                parse_mode="Markdown"
-                            )
-                            logger.info(f"✅ Sent waiting message to user {participant.user_id}")
-                        except Exception as e:
-                            logger.error(f"❌ Failed to send waiting message to user {participant.user_id}: {e}")
-                    else:
-                        logger.info(f"ℹ️ Skipping test user {participant.user_id}")
+                    try:
+                        await bot.send_message(
+                            chat_id=participant.user_id,
+                            text=waiting_msg,
+                            parse_mode="Markdown"
+                        )
+                        logger.info(f"✅ Sent waiting message to user {participant.user_id}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to send waiting message to user {participant.user_id}: {e}")
                 
                 # Сохраняем информацию о слоте для последующей обработки
                 # Когда пользователь создаст группу, бот получит уведомление
@@ -190,6 +184,9 @@ class RoomManager:
 🍿 **Приятного просмотра!**"""
         
         # Send notification to all participants
+        sent_count = 0
+        failed_count = 0
+        
         for participant in slot.participants:
             try:
                 await bot.send_message(
@@ -198,8 +195,12 @@ class RoomManager:
                     parse_mode="Markdown"
                 )
                 logger.info(f"✅ Sent enhanced notification to user {participant.user_id}")
+                sent_count += 1
             except Exception as e:
-                logger.error(f"Failed to notify user {participant.user_id}: {e}")
+                logger.error(f"❌ Failed to notify user {participant.user_id}: {e}")
+                failed_count += 1
+        
+        logger.info(f"📊 Fallback notification summary: {sent_count} sent, {failed_count} failed")
         
         return slot.room if slot.room else None
     

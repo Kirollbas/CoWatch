@@ -15,7 +15,7 @@ class WatchTogetherService:
     @staticmethod
     def create_wt_room(db: Session, slot: Slot) -> Optional[str]:
         # Check if API key is configured
-        if not Config.WATCH_TOGETHER_API_KEY or Config.WATCH_TOGETHER_API_KEY == "test_key_placeholder":
+        if not Config.WATCH_TOGETHER_API_KEY:
             logger.warning(f"Watch Together API key not configured, skipping room creation for slot {slot.id}")
             return None
             

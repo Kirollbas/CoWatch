@@ -39,3 +39,5 @@ class Config:
         # Watch Together API key is optional for testing
         if not cls.WATCH_TOGETHER_API_KEY:
             print("⚠️ WATCH_TOGETHER_API_KEY is not set - Watch Together functionality will be disabled")
+        elif cls.WATCH_TOGETHER_API_KEY == "test_key_placeholder":
+            print("ℹ️ Using test Watch Together API key - rooms will be created with test key")

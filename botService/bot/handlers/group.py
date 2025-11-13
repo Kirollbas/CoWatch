@@ -210,7 +210,10 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 🍿 **Приятного просмотра!**"""
             
             # Send to all participants except the creator
-            logger.info(f"📨 Sending invites to participants...")
+            logger.info(f"📨 Sending invites to {len(active_slot.participants)} participants...")
+            
+            sent_count = 0
+            failed_count = 0
             
             for participant in active_slot.participants:
                 logger.info(f"🔍 Processing participant {participant.user_id}, creator: {creator_id}")
@@ -223,11 +226,15 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                             parse_mode="Markdown"
                         )
                         logger.info(f"✅ Sent group invite to user {participant.user_id}")
+                        sent_count += 1
                     except Exception as e:
                         logger.error(f"❌ Failed to send invite to user {participant.user_id}: {e}")
                         logger.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
+                        failed_count += 1
                 else:
                     logger.info(f"ℹ️ Skipping creator {participant.user_id}")
+            
+            logger.info(f"📊 Invite sending summary: {sent_count} sent, {failed_count} failed")
             
             logger.info(f"🎉 Group setup completed successfully!")
             
