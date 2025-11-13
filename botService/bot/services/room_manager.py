@@ -49,9 +49,12 @@ class RoomManager:
                         participants_info.append(f"• {user_info.first_name}")
                 except Exception as e:
                     logger.warning(f"Could not get info for user {participant.user_id}: {e}")
-                    # Специальная обработка для известных тестовых пользователей
-                    if participant.user_id == 999888777:
-                        participants_info.append(f"• @petontyapa")
+                    # Fallback to user data from database
+                    user = participant.user
+                    if user and user.username:
+                        participants_info.append(f"• @{user.username} ({user.first_name})")
+                    elif user and user.first_name:
+                        participants_info.append(f"• {user.first_name}")
                     else:
                         participants_info.append(f"• User {participant.user_id}")
             
@@ -142,7 +145,7 @@ class RoomManager:
         """Send enhanced notification with participant contacts"""
         logger.info(f"Sending enhanced room notifications for slot {slot.id}")
         
-        # Collect participant information with proper @petontyapa display
+        # Collect participant information
         participants_info = []
         for participant in slot.participants:
             try:
@@ -150,12 +153,15 @@ class RoomManager:
                 if user_info.username:
                     participants_info.append(f"• @{user_info.username} ({user_info.first_name})")
                 else:
-                    participants_info.append(f"• {user_info.first_name} (ID: {participant.user_id})")
+                    participants_info.append(f"• {user_info.first_name}")
             except Exception as e:
                 logger.warning(f"Could not get info for user {participant.user_id}: {e}")
-                # Special handling for known test users
-                if participant.user_id == 999888777:
-                    participants_info.append(f"• @petontyapa")
+                # Fallback to user data from database
+                user = participant.user
+                if user and user.username:
+                    participants_info.append(f"• @{user.username} ({user.first_name})")
+                elif user and user.first_name:
+                    participants_info.append(f"• {user.first_name}")
                 else:
                     participants_info.append(f"• User {participant.user_id}")
         
