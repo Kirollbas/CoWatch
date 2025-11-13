@@ -357,10 +357,9 @@ async def handle_min_participants(update: Update, context: ContextTypes.DEFAULT_
                 # Create Telegram group
                 await RoomManager.create_room_for_slot(updated_slot, context.bot)
                 
-                # Notify all participants (only real users, skip test users)
-                real_user_ids = [890859555, 999888777]  # Add real user IDs here (you + @petontyapa)
+                # Notify all participants
                 for participant in updated_slot.participants:
-                    if participant.user_id != user_id and participant.user_id in real_user_ids:
+                    if participant.user_id != user_id:
                         try:
                             await context.bot.send_message(
                                 chat_id=participant.user_id,

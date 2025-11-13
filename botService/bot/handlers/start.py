@@ -141,8 +141,12 @@ async def handle_group_creation(update: Update, context: ContextTypes.DEFAULT_TY
                 else:
                     participants_info.append(f"• {user_info.first_name}")
             except:
-                if participant.user_id == 999888777:
-                    participants_info.append(f"• @petontyapa")
+                # Fallback to user data from database
+                user = participant.user
+                if user and user.username:
+                    participants_info.append(f"• @{user.username} ({user.first_name})")
+                elif user and user.first_name:
+                    participants_info.append(f"• {user.first_name}")
                 else:
                     participants_info.append(f"• User {participant.user_id}")
         
