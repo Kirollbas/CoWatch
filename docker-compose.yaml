@@ -42,6 +42,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - co-watch-network
