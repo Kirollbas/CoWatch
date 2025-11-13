@@ -14,11 +14,31 @@ class Config:
     if not DATABASE_URL or DATABASE_URL == "postgresql://cowatch_user:cowatch_password@localhost:5432/cowatch":
         # Используем SQLite если PostgreSQL не настроен
         # Определяем путь к БД относительно корня проекта (botService/)
-        project_root = Path(__file__).parent.parent
-        db_path = os.getenv("DATABASE_PATH", str(project_root / "cowatch.db"))
-        DATABASE_URL = os.getenv("DATABASE_URL_SQLITE", f"sqlite:///{db_path}")
-        if not DATABASE_URL.startswith("sqlite"):
-            DATABASE_URL = f"sqlite:///{db_path}"
+        project_root = Path(__file__).parent.parent.resolve()  # Используем resolve() сразу
+        db_path_env = os.getenv("DATABASE_PATH")
+        if db_path_env:
+            db_path = Path(db_path_env).resolve()
+        else:
+            db_path = project_root / "cowatch.db"
+        
+        # Проверяем DATABASE_URL_SQLITE из .env, но преобразуем относительный путь в абсолютный
+        db_url_sqlite = os.getenv("DATABASE_URL_SQLITE")
+        if db_url_sqlite and db_url_sqlite.startswith("sqlite:///"):
+            # Извлекаем путь из URL
+            db_path_from_env = db_url_sqlite.replace("sqlite:///", "")
+            # Преобразуем относительный путь в абсолютный
+            if not Path(db_path_from_env).is_absolute():
+                # Если путь относительный, разрешаем его относительно project_root
+                db_path = (project_root / db_path_from_env).resolve()
+            else:
+                db_path = Path(db_path_from_env)
+            # SQLite требует формат sqlite:///path (три слэша для абсолютного пути)
+            db_path_str = str(db_path)
+            DATABASE_URL = f"sqlite:///{db_path_str}"
+        else:
+            # Если DATABASE_URL_SQLITE не указан, используем вычисленный путь
+            db_path_str = str(db_path)
+            DATABASE_URL = f"sqlite:///{db_path_str}"
     
     MIN_PARTICIPANTS_DEFAULT = int(os.getenv("MIN_PARTICIPANTS_DEFAULT", "1"))
     
