@@ -137,12 +137,15 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             
             logger.info(f"✅ Created invite link: {invite_link.invite_link}")
             
-            # Send success message to group
+            # Send success message to group with participants list
             success_msg = f"""✅ **Группа настроена!**
 
 🎬 **Фильм:** {active_slot.movie.title}
 📅 **Время:** {active_slot.datetime.strftime('%d.%m.%Y в %H:%M')}
 👥 **Участники:** {len(active_slot.participants)}
+
+👥 **Список участников:**
+{chr(10).join(participants_info)}
 
 🔗 **Ссылка-приглашение создана!**
 Отправляю её всем участникам слота...
@@ -154,7 +157,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 text=success_msg,
                 parse_mode="Markdown"
             )
-            logger.info(f"✅ Sent success message to group")
+            logger.info(f"✅ Sent success message to group with participants list")
             
             # Send invite link to all slot participants
             logger.info(f"📤 Preparing to send invites to {len(active_slot.participants)} participants")
@@ -166,11 +169,18 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                         participants_info.append(f"• @{user_info.username} ({user_info.first_name})")
                     else:
                         participants_info.append(f"• {user_info.first_name}")
-                except:
+                    logger.info(f"✅ Got user info for {participant.user_id}: {user_info.first_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not get user info for {participant.user_id}: {e}")
+                    # Fallback names for known test users
                     if participant.user_id == 999888777:
                         participants_info.append(f"• @petontyapa")
+                    elif participant.user_id == 890859555:
+                        participants_info.append(f"• @attachsir")
+                    elif participant.user_id == 778097765:
+                        participants_info.append(f"• @petontyapa")
                     else:
-                        participants_info.append(f"• User {participant.user_id}")
+                        participants_info.append(f"• Пользователь {participant.user_id}")
             
             invite_msg = f"""🎉 **Группа создана!**
 
@@ -189,27 +199,23 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 🍿 **Приятного просмотра!**"""
             
-            # Send to all participants except the creator (only real users)
+            # Send to all participants except the creator
             logger.info(f"📨 Sending invites to participants...")
-            real_user_ids = [890859555, 778097765]  # Ваш ID и ID друга (@petontyapa)
             
             for participant in active_slot.participants:
                 logger.info(f"🔍 Processing participant {participant.user_id}, creator: {creator_id}")
                 if participant.user_id != creator_id:
                     logger.info(f"📤 Attempting to send invite to user {participant.user_id}")
-                    if participant.user_id in real_user_ids:
-                        try:
-                            await context.bot.send_message(
-                                chat_id=participant.user_id,
-                                text=invite_msg,
-                                parse_mode="Markdown"
-                            )
-                            logger.info(f"✅ Sent group invite to user {participant.user_id}")
-                        except Exception as e:
-                            logger.error(f"❌ Failed to send invite to user {participant.user_id}: {e}")
-                            logger.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
-                    else:
-                        logger.info(f"ℹ️ User {participant.user_id} not in real_user_ids list: {real_user_ids}")
+                    try:
+                        await context.bot.send_message(
+                            chat_id=participant.user_id,
+                            text=invite_msg,
+                            parse_mode="Markdown"
+                        )
+                        logger.info(f"✅ Sent group invite to user {participant.user_id}")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to send invite to user {participant.user_id}: {e}")
+                        logger.error(f"❌ Error details: {type(e).__name__}: {str(e)}")
                 else:
                     logger.info(f"ℹ️ Skipping creator {participant.user_id}")
             
