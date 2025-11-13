@@ -1,6 +1,7 @@
 """SQLAlchemy models"""
 from sqlalchemy import Column, Integer, BigInteger, String, Float, Text, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint
 from datetime import datetime
 import enum
 
@@ -27,6 +28,39 @@ class User(Base):
     comments = relationship("Comment", back_populates="user")
     likes = relationship("Like", back_populates="user")
     watch_history = relationship("WatchHistory", back_populates="user")
+
+class UserKinopoisk(Base):
+    """Mapping of Telegram user to Kinopoisk user id"""
+    __tablename__ = "user_kinopoisk"
+    
+    user_id = Column(BigInteger, ForeignKey("users.id"), primary_key=True)
+    kp_user_id = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    
+    # Relationship
+    user = relationship("User")
+
+class UserVote(Base):
+    """User's Kinopoisk votes/preferences"""
+    __tablename__ = "user_votes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kinopoisk_id", name="uq_user_movie_vote"),
+    )
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    kinopoisk_id = Column(String, nullable=False)  # KP movie id
+    title = Column(String, nullable=True)
+    year = Column(Integer, nullable=True)
+    type = Column(String, nullable=True)  # FILM / TV_SERIES
+    user_rating = Column(Integer, nullable=False)  # 1-10 scale on KP
+    poster_url = Column(String, nullable=True)
+    genres = Column(String, nullable=True)  # comma-separated genres
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow())
+    
+    # Relationship
+    user = relationship("User")
 
 
 class Movie(Base):
@@ -56,7 +90,7 @@ class Movie(Base):
     age_rating = Column(String, nullable=True)          # Возрастной рейтинг (например, "18+")
     slogan = Column(String, nullable=True)              # Слоган фильма
     countries = Column(String, nullable=True)           # JSON строка со странами
-    genres = Column(String, nullable=True)              # JSON строка с жанрами
+    genres = Column(String, nullable=True)              # comma-separated genres (compatible with main)
     
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
     updated_at = Column(DateTime, nullable=True, onupdate=lambda: datetime.utcnow())  # Время последнего обновления из API

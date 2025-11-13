@@ -4,8 +4,9 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMa
 def get_main_menu_keyboard():
     """Get main menu reply keyboard"""
     keyboard = [
-        [KeyboardButton("/add_movie"), KeyboardButton("/my_slots")],
-        [KeyboardButton("/my_rooms"), KeyboardButton("/profile")],
+        [KeyboardButton("/recommend"), KeyboardButton("/add_movie")],
+        [KeyboardButton("/my_slots"), KeyboardButton("/my_rooms")],
+        [KeyboardButton("/profile"), KeyboardButton("/link_kp")],
         [KeyboardButton("/help")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

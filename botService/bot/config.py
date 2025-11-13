@@ -22,6 +22,12 @@ class Config:
     
     MIN_PARTICIPANTS_DEFAULT = int(os.getenv("MIN_PARTICIPANTS_DEFAULT", "2"))
     
+    # Kinopoisk API configuration
+    KINOPOISK_API_KEY = os.getenv("KINOPOISK_API_KEY")
+    
+    # Watch2Gether API configuration
+    WATCH_TOGETHER_API_KEY = os.getenv("WATCH_TOGETHER_API_KEY")
+    
     @classmethod
     def validate(cls):
         """Validate that all required configuration is present"""
@@ -32,3 +38,7 @@ class Config:
             )
         if not cls.DATABASE_URL:
             raise ValueError("DATABASE_URL is not set in environment variables")
+        if not cls.KINOPOISK_API_KEY:
+            raise ValueError("KINOPOISK_API_KEY is not set in environment variables")
+        if not cls.WATCH_TOGETHER_API_KEY:
+            raise ValueError("WATCH_TOGETHER_API_KEY is not set in environment variables")

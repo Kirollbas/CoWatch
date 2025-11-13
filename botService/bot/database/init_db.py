@@ -79,12 +79,50 @@ def init_database():
                 raise
         
         logger.info("Database migrations applied successfully!")
+        
+        # Ensure schema compatibility (check for missing columns that might not be in migrations)
+        ensure_schema()
+        
         return True
         
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
 
+
+def ensure_schema():
+    """Ensure new nullable columns exist on existing tables"""
+    from sqlalchemy import text, inspect
+    from bot.database.session import engine
+    
+    insp = inspect(engine)
+    dialect = engine.dialect.name
+    
+    # movies.genres
+    try:
+        if insp.has_table("movies"):
+            cols = {c["name"] for c in insp.get_columns("movies")}
+            if "genres" not in cols:
+                ddl = "ALTER TABLE movies ADD COLUMN genres VARCHAR" if dialect != "sqlite" else "ALTER TABLE movies ADD COLUMN genres TEXT"
+                with engine.connect() as conn:
+                    conn.execute(text(ddl))
+                    conn.commit()
+                logger.info("Added movies.genres column")
+    except Exception as e:
+        logger.warning(f"Schema check for movies.genres failed: {e}")
+    
+    # user_votes.genres
+    try:
+        if insp.has_table("user_votes"):
+            cols = {c["name"] for c in insp.get_columns("user_votes")}
+            if "genres" not in cols:
+                ddl = "ALTER TABLE user_votes ADD COLUMN genres VARCHAR" if dialect != "sqlite" else "ALTER TABLE user_votes ADD COLUMN genres TEXT"
+                with engine.connect() as conn:
+                    conn.execute(text(ddl))
+                    conn.commit()
+                logger.info("Added user_votes.genres column")
+    except Exception as e:
+        logger.warning(f"Schema check for user_votes.genres failed: {e}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

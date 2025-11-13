@@ -9,6 +9,7 @@ from bot.database.session import SessionLocal
 from bot.database.repositories import MovieRepository, SlotRepository, SlotParticipantRepository
 from bot.database.models import SlotParticipant
 from bot.services.movie_parser import MovieParser
+from bot.services.matching import MatchingService
 from bot.utils.validators import validate_movie_url
 from bot.utils.keyboards import get_movie_actions_keyboard, get_slots_list_keyboard
 from bot.utils.formatters import format_movie_info, format_slot_info
@@ -46,9 +47,8 @@ async def handle_movie_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     db: Session = SessionLocal()
     try:
-        # Parse movie data (stub)
-        parser = MovieParser()
-        movie_data = parser.parse_url(url)
+        # Parse movie data using Kinopoisk API
+        movie_data = MovieParser.parse_url(url)
         
         if not movie_data:
             await update.message.reply_text("❌ Не удалось обработать ссылку. Попробуйте другую.")
@@ -168,26 +168,34 @@ async def handle_movie_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             slots_text = ""
         
-        # Show available slots to join
+        # Show available slots to join (sorted by compatibility)
         if available_slots:
             if slots_text:
                 slots_text += "\n📅 <b>Доступные слоты:</b>\n"
             else:
                 slots_text = "\n\n📅 <b>Доступные слоты:</b>\n"
-                
-            for i, slot in enumerate(available_slots, 1):
+            
+            # Score and sort by compatibility
+            scored = MatchingService.annotate_slots_by_compatibility(db, user_id, available_slots)
+            
+            for i, (slot, score) in enumerate(scored, 1):
                 participants_count = len(slot.participants)
                 needed = slot.min_participants - participants_count
-                slots_text += f"{i}. {slot.datetime.strftime('%d.%m.%Y %H:%M')} "
+                stars = max(0, min(3, int(round(score * 3))))
+                stars_text = f" {'⭐'*stars}" if stars > 0 else ""
+                slots_text += f"{i}. {slot.datetime.strftime('%d.%m.%Y %H:%M')}{stars_text} "
                 slots_text += f"({participants_count}/{slot.min_participants}, нужно еще {needed})\n"
             
             slots_text += "\n💡 Нажмите на слот чтобы присоединиться:"
             
             # Add slot buttons
-            for slot in available_slots:
+            for (slot, score) in scored:
                 participants_count = len(slot.participants)
                 needed = slot.min_participants - participants_count
-                button_text = f"{slot.datetime.strftime('%d.%m %H:%M')} (нужно еще {needed})"
+                stars = max(0, min(3, int(round(score * 3))))
+                star_emoji = "⭐"*stars
+                suffix = f" {star_emoji}" if stars > 0 else ""
+                button_text = f"{slot.datetime.strftime('%d.%m %H:%M')} (нужно еще {needed}){suffix}"
                 buttons.append([
                     InlineKeyboardButton(button_text, callback_data=f"join_slot:{slot.id}")
                 ])
@@ -236,7 +244,7 @@ async def create_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         
         # Store state for conversation
-        set_state(user_id, f"waiting_for_slot_datetime:{movie_id}")
+        set_state(user_id, f"waiting_for_slot_datetime|{movie_id}")
         
         await query.edit_message_text(
             f"Создание слота для: <b>{movie.title}</b>\n\n"
@@ -253,10 +261,10 @@ async def handle_slot_datetime(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     
     state = get_state(user_id)
-    if not state or not state.startswith("waiting_for_slot_datetime:"):
+    if not state or not state.startswith("waiting_for_slot_datetime|"):
         return
     
-    movie_id = int(state.split(":")[1])
+    movie_id = int(state.split("|")[1])
     datetime_str = update.message.text.strip()
     
     from bot.utils.validators import parse_datetime
