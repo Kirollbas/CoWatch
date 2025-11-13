@@ -23,7 +23,7 @@ from bot.handlers.rating import rate_command, rate_user_callback
 from bot.handlers.group import handle_bot_added_to_group
 from bot.handlers.kp import link_kp_command, handle_kp_id
 from bot.handlers.recommend import recommend_command
-from bot.utils.states import check_state
+from bot.utils.states import check_state, get_state
 
 # Configure logging
 logging.basicConfig(
@@ -36,25 +36,35 @@ logger = logging.getLogger(__name__)
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle text messages based on user state"""
     user_id = update.effective_user.id
+    state = get_state(user_id)
     
-    # Check if user is sending Kinopoisk ID
+    if state:
+        # Prefer explicit state routing to avoid ambiguity
+        if state.startswith("waiting_for_kp_id"):
+            await handle_kp_id(update, context)
+            return
+        if state.startswith("waiting_for_min_participants|"):
+            await handle_min_participants(update, context)
+            return
+        if state.startswith("waiting_for_slot_datetime|"):
+            await handle_slot_datetime(update, context)
+            return
+        if state == "waiting_for_movie_url":
+            await handle_movie_url(update, context)
+            return
+    
+    # Legacy fallbacks (kept for safety)
     if check_state(user_id, "waiting_for_kp_id"):
         await handle_kp_id(update, context)
         return
-    
-    # Check if user is waiting for movie URL
-    if check_state(user_id, "waiting_for_movie_url"):
-        await handle_movie_url(update, context)
+    if check_state(user_id, "waiting_for_min_participants|"):
+        await handle_min_participants(update, context)
         return
-    
-    # Check if user is waiting for slot datetime
     if check_state(user_id, "waiting_for_slot_datetime|"):
         await handle_slot_datetime(update, context)
         return
-    
-    # Check if user is waiting for min participants
-    if check_state(user_id, "waiting_for_min_participants|"):
-        await handle_min_participants(update, context)
+    if check_state(user_id, "waiting_for_movie_url"):
+        await handle_movie_url(update, context)
         return
     
     # Default: echo message

@@ -78,6 +78,13 @@ class MovieParser:
         else:
             movie_type = MovieType.MOVIE
         
+        genres_list = []
+        try:
+            genres_list = [g.get("genre") for g in (data.get("genres") or []) if g.get("genre")]
+        except Exception:
+            genres_list = []
+        genres = ", ".join(genres_list) if genres_list else None
+        
         return {
             "title": data.get("nameRu") or data.get("nameEn") or data.get("nameOriginal"),
             "year": data.get("year"),
@@ -85,5 +92,6 @@ class MovieParser:
             "kinopoisk_id": str(data.get("kinopoiskId")),
             "imdb_id": str(data.get("imdbId")),
             "description": data.get("description"),
-            "poster_url": data.get("posterUrlPreview") or data.get("posterUrl")
+            "poster_url": data.get("posterUrlPreview") or data.get("posterUrl"),
+            "genres": genres
         }
