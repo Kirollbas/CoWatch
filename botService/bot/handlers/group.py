@@ -150,6 +150,17 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             
             logger.info(f"✅ Created invite link: {invite_link.invite_link}")
             
+            # Get participants info from database
+            logger.info(f"📤 Preparing participants list for {len(active_slot.participants)} participants")
+            participants_info = []
+            for participant in active_slot.participants:
+                user = participant.user  # Use the relationship to get User data
+                if user.username:
+                    participants_info.append(f"• @{user.username} ({user.first_name})")
+                else:
+                    participants_info.append(f"• {user.first_name}")
+                logger.info(f"✅ Added participant: {user.first_name} (ID: {user.id})")
+            
             # Send success message to group with participants list
             wt_section = ""
             if wt_room_url:
@@ -180,27 +191,7 @@ async def setup_movie_group(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             logger.info(f"✅ Sent success message to group with participants list")
             
             # Send invite link to all slot participants
-            logger.info(f"📤 Preparing to send invites to {len(active_slot.participants)} participants")
-            participants_info = []
-            for participant in active_slot.participants:
-                try:
-                    user_info = await context.bot.get_chat(participant.user_id)
-                    if user_info.username:
-                        participants_info.append(f"• @{user_info.username} ({user_info.first_name})")
-                    else:
-                        participants_info.append(f"• {user_info.first_name}")
-                    logger.info(f"✅ Got user info for {participant.user_id}: {user_info.first_name}")
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not get user info for {participant.user_id}: {e}")
-                    # Fallback names for known test users
-                    if participant.user_id == 999888777:
-                        participants_info.append(f"• @petontyapa")
-                    elif participant.user_id == 890859555:
-                        participants_info.append(f"• @attachsir")
-                    elif participant.user_id == 778097765:
-                        participants_info.append(f"• @petontyapa")
-                    else:
-                        participants_info.append(f"• Пользователь {participant.user_id}")
+            logger.info(f"📨 Sending invites to participants...")
             
             invite_msg = f"""🎉 **Группа создана!**
 
